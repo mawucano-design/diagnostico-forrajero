@@ -1,9 +1,9 @@
 credentials:
-  usernames: admin
-    admin:
+  usernames:
+    admin: admin
       email: admin@tuempresa.com
       name: Administrador
-      password: admin123
+      password: $2b$12$9fK8v7c6d5e4f3g2h1i0j.kLmNoPqRsTuVwXyZ1Y2X3W4V5U6T7S
     juan:
       email: juan@tuempresa.com
       name: Juan Pérez
