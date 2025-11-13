@@ -3,15 +3,15 @@ credentials:
     admin:
       email: admin@tuempresa.com
       name: Administrador
-      password: $2b$12$W5z8X7Y6V5U4T3S2R1Q0P.O9N8M7L6K5J4I3H2G1F0E9D8C7B6A5
+      password: $2b$12$XxXDw83MsoXhxe0Opny1PeoLuSH5dgSUVu992lhl.sFv/AgSUkB8G
     juan:
       email: juan@tuempresa.com
       name: Juan Pérez
-      password: $2b$12$Z4Y3X2W1V0U9T8S7R6Q5P.O4N3M2L1K0J9I8H7G6F5E4D3C2B1A0
+      password: $2b$12$nIPssYVHEFxyEKNCyrgeAO0PIzcYXBfNlWTB7WgpDi3.l4EbbrloC
     ana:
       email: ana@tuempresa.com
       name: Ana López
-      password: $2b$12$A1B2C3D4E5F6G7H8I9J0K.L1M2N3O4P5Q6R7S8T9U0V1W2X3Y4Z5
+      password: $2b$12$SPxwWIpTHNHO7AtzucoXyu9U0Ia1Xj8SDC9sT.DtwOOFDDgtR8l7m
 cookie:
   expiry_days: 30
   key: regenerativo2025claveunica
