@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import tempfile
 import zipfile
+import os
 import folium
 from streamlit_folium import st_folium
 from sentinelhub import SHConfig, DataCollection, MimeType, CRS, BBox, Geometry, SentinelHubRequest, bbox_to_dimensions
@@ -12,6 +13,7 @@ from docx.shared import Inches
 import io
 import base64
 import streamlit.components.v1 as components
+from datetime import datetime, timedelta  # ← IMPORT FALTANTE
 
 st.title("Análisis Forrajero Regenerativo")
 
@@ -30,7 +32,7 @@ except:
 with st.sidebar:
     st.header("Parámetros")
     tipo_pastura = st.selectbox("Pastura", ["Alfalfa", "Raygrass", "Festuca", "Natural"])
-    fecha = st.date_input("Fecha imagen", max_value=st.date_input("Hoy", datetime.now()).value)
+    fecha = st.date_input("Fecha imagen", max_value=datetime.now())
     nubes = st.slider("Nubes máx (%)", 0, 100, 20)
     peso_vaca = st.slider("Peso promedio (kg)", 400, 600, 500)
     eficiencia = st.slider("Eficiencia pastoreo (%)", 40, 80, 55) / 100
