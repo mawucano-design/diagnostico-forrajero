@@ -43,10 +43,10 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- LOGIN SIMPLE (SIN FIELDS - NUEVO FORMATO) ---
-authenticator.login('Iniciar Sesión')
+# --- LOGIN CORRECTO ---
+authenticator.login('Iniciar Sesión', 'main')
 
-# Leer estado del login
+# Leer estado
 name = st.session_state.get('name')
 authentication_status = st.session_state.get('authentication_status')
 username = st.session_state.get('username')
