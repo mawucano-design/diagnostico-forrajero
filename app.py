@@ -43,10 +43,10 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- LOGIN CORRECTO PARA 0.2.1 (POSICIONAL) ---
+# --- LOGIN CORRECTO PARA 0.2.1 (ETIQUETAS EN INGLÉS) ---
 authenticator.login('Iniciar Sesión', location='main', fields={
     'usernames': 'Username',
-    'passwords': 'Contraseña',
+    'password': 'Password',
     'Log in': 'Entrar'
 })
 
