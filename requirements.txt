@@ -1,4 +1,5 @@
 streamlit
+streamlit-authenticator
 geopandas
 pandas
 numpy
@@ -6,3 +7,4 @@ folium
 streamlit-folium
 python-docx
 earthengine-api
+pyyaml
