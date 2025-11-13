@@ -43,17 +43,12 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- LOGIN CON FIELDS (PARA 0.2.1) ---
-authenticator.login(
-    form_name='Iniciar Sesión',
-    location='main',
-    fields={
-        'Form name': 'Iniciar Sesión',
-        'Username': 'Username',
-        'Password': 'Contraseña',
-        'Login': 'Entrar'
-    }
-)
+# --- LOGIN CORRECTO PARA 0.2.1 (POSICIONAL) ---
+authenticator.login('Iniciar Sesión', location='main', fields={
+    'usernames': 'Username',
+    'passwords': 'Contraseña',
+    'Log in': 'Entrar'
+})
 
 # Leer estado
 name = st.session_state.get('name')
