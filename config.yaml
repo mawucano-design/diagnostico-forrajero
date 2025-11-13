@@ -1,0 +1,16 @@
+credentials:
+  usernames:
+    juan:
+      email: juan@tuempresa.com
+      name: Juan Pérez
+    ana:
+      email: ana@tuempresa.com
+      name: Ana López
+cookie:
+  expiry_days: 30
+  key: regenerativo2025claveunica
+  name: forrajero_regenerativo
+preauthorized:
+  emails:
+    - juan@tuempresa.com
+    - ana@tuempresa.com
