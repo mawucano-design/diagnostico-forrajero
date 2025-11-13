@@ -3,13 +3,18 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
-st.set_page_config(page_title="Forrajero Regenerativo", layout="wide")
+# Configuración de la página
+st.set_page_config(
+    page_title="Forrajero Regenerativo",
+    page_icon="🌱",
+    layout="wide"
+)
 
-# Cargar config
+# Cargar config.yaml
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
-# Autenticador
+# Crear autenticador
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -18,7 +23,7 @@ authenticator = stauth.Authenticate(
     config.get('preauthorized', [])
 )
 
-# --- REGISTRO AUTOMÁTICO (NUEVO FORMATO) ---
+# --- REGISTRO AUTOMÁTICO ---
 with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     try:
         email = st.text_input("Email", key="reg_email")
@@ -30,9 +35,9 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
             
             if st.button("Crear cuenta"):
                 if password1 == password2 and len(password1) >= 6:
-                    # NUEVO FORMATO: Sin form_name, usa fields por default
-                    if authenticator.register_user(username, name, email, password1):
-                        st.success("Cuenta creada. Ahora inicia sesión.")
+                    success = authenticator.register_user(username, name, email, password1)
+                    if success:
+                        st.success("¡Cuenta creada! Ahora inicia sesión.")
                         st.rerun()
                     else:
                         st.error("Error al crear usuario.")
@@ -44,21 +49,26 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- LOGIN (NUEVO FORMATO) ---
-authenticator.login('Iniciar Sesión')
+# --- LOGIN CON EMAIL (NO USERNAME) ---
+authenticator.login('Iniciar Sesión', fields={
+    'Form name': 'Iniciar Sesión',
+    'Username': 'Email',
+    'Password': 'Contraseña',
+    'Login': 'Entrar'
+})
 
-# Leer resultados del login desde session_state
+# Leer estado del login
 name = st.session_state.get('name')
 authentication_status = st.session_state.get('authentication_status')
 username = st.session_state.get('username')
 
-# --- INTERFAZ SEGÚN ESTADO ---
+# --- INTERFAZ ---
 if authentication_status:
     st.sidebar.success(f'¡Bienvenido, {name}!')
     authenticator.logout('Salir', 'sidebar')
     st.title('Analizador Forrajero Regenerativo')
     st.markdown('**Análisis satelital + ganadería regenerativa.**')
-    st.info('Ve al menú → **Análisis Regenerativo**')
+    st.info('Ve al menú lateral → **Análisis Regenerativo**')
 
 elif authentication_status == False:
     st.error('Email o contraseña incorrectos.')
