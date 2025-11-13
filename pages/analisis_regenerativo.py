@@ -7,9 +7,8 @@ import zipfile
 import os
 import folium
 from streamlit_folium import st_folium
-from sentinelhub import SHConfig, DataCollection, MimeType, CRS, BBox, Geometry, SentinelHubRequest, bbox_to_dimensions
+from sentinelhub import SHConfig, DataCollection, MimeType, CRS, BBox, SentinelHubRequest, bbox_to_dimensions
 from docx import Document
-from docx.shared import Inches
 import io
 import base64
 import streamlit.components.v1 as components
@@ -21,23 +20,23 @@ st.title("Análisis Forrajero Regenerativo")
 # --- CREDENCIALES ---
 try:
     config = SHConfig()
-    config.sh_client_id = st.secrets["SENTINEL_HUB_CLIENT_ID"]
-    config.sh_client_secret = st.secrets["SENTINEL_HUB_CLIENT_SECRET"]
-    config.instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "")
+    config.sh_client_id = st.secrets["SENTINEL_HUB_CLIENT_ID"].strip()
+    config.sh_client_secret = st.secrets["SENTINEL_HUB_CLIENT_SECRET"].strip()
+    config.instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "").strip()
+    
+    if not config.sh_client_id or not config.sh_client_secret:
+        raise ValueError("Faltan credenciales")
     SH_OK = True
 except Exception as e:
     SH_OK = False
-    st.error(f"Error en credenciales: {e}")
+    st.error(f"Credenciales inválidas: {e}")
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("Parámetros")
     tipo_pastura = st.selectbox("Pastura", ["Alfalfa", "Raygrass", "Festuca", "Natural"])
-    
-    # Fecha con valor por defecto
     default_date = datetime.now().date()
     fecha = st.date_input("Fecha imagen", value=default_date, max_value=default_date)
-    
     nubes = st.slider("Nubes máx (%)", 0, 100, 20)
     peso_vaca = st.slider("Peso promedio (kg)", 400, 600, 500)
     eficiencia = st.slider("Eficiencia pastoreo (%)", 40, 80, 55) / 100
@@ -58,7 +57,8 @@ if uploaded and SH_OK:
         if gdf.crs is None:
             gdf = gdf.set_crs('EPSG:4326')
         gdf = gdf.to_crs('EPSG:4326')
-        st.success(f"{len(gdf)} lotes cargados")
+        gdf = gdf[gdf.geometry.notna()]  # Eliminar nulos
+        st.success(f"{len(gdf)} lotes válidos cargados")
 else:
     gdf = None
 
@@ -73,49 +73,52 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
         progress_bar.progress((idx + 1) / len(gdf))
 
         geom = row.geometry
-        bbox = BBox(geom.bounds, crs=CRS.WGS84)
-        size = bbox_to_dimensions(bbox, resolution=10)
-
-        evalscript = """
-        //VERSION=3
-        function setup() {
-            return {
-                input: ["B04", "B08", "dataMask"],
-                output: { bands: 4 }
-            };
-        }
-        function evaluatePixel(samples) {
-            let ndvi = (samples.B08 - samples.B04)/(samples.B08 + samples.B04 + 0.0001);
-            return [ndvi, ndvi, ndvi, samples.dataMask];
-        }
-        """
-
-        request = SentinelHubRequest(
-            evalscript=evalscript,
-            input_data=[SentinelHubRequest.input_data(
-                data_collection=DataCollection.SENTINEL2_L2A,
-                time_interval=(str(fecha), str(fecha + timedelta(days=1))),
-                other_args={"maxcc": nubes / 100}
-            )],
-            responses=[SentinelHubRequest.output_response('default', MimeType.TIFF)],
-            bbox=bbox,
-            size=size,
-            config=config
-        )
-
-        try:
-            response = request.get_data()[0]
-            mask = response[..., 3] == 1
-            ndvi_values = response[..., 0][mask]
-            ndvi_mean = np.mean(ndvi_values) if len(ndvi_values) > 0 else 0.1
-        except Exception as e:
-            st.warning(f"Lote {i+1}: sin datos → {e}")
+        if geom is None or geom.is_empty:
             ndvi_mean = 0.1
+        else:
+            bbox = BBox(geom.bounds, crs=CRS.WGS84)
+            size = bbox_to_dimensions(bbox, resolution=10)
 
-        area_ha = geom.area / 10000
+            evalscript = """
+            //VERSION=3
+            function setup() {
+                return {
+                    input: ["B04", "B08", "dataMask"],
+                    output: { bands: 4 }
+                };
+            }
+            function evaluatePixel(samples) {
+                let ndvi = (samples.B08 - samples.B04)/(samples.B08 + samples.B04 + 0.0001);
+                return [ndvi, ndvi, ndvi, samples.dataMask];
+            }
+            """
+
+            request = SentinelHubRequest(
+                evalscript=evalscript,
+                input_data=[SentinelHubRequest.input_data(
+                    data_collection=DataCollection.SENTINEL2_L2A,
+                    time_interval=(str(fecha), str(fecha + timedelta(days=1))),
+                    other_args={"maxcc": nubes / 100}
+                )],
+                responses=[SentinelHubRequest.output_response('default', MimeType.TIFF)],
+                bbox=bbox,
+                size=size,
+                config=config
+            )
+
+            try:
+                response = request.get_data()[0]
+                mask = response[..., 3] == 1
+                ndvi_values = response[..., 0][mask]
+                ndvi_mean = np.mean(ndvi_values) if len(ndvi_values) > 0 else 0.1
+            except Exception as e:
+                st.warning(f"Lote {i+1}: sin datos → {e}")
+                ndvi_mean = 0.1
+
+        area_ha = geom.area / 10000 if geom else 0
         biomasa = max(ndvi_mean * 4000, 1000) if ndvi_mean > 0.3 else 1000
         consumo_dia = peso_vaca * 0.025 * eficiencia
-        ev_ha = biomasa / (consumo_dia * 30)
+        ev_ha = biomasa / (consumo_dia * 30) if consumo_dia > 0 else 0
         dias = biomasa / (consumo_dia * ev_ha) if ev_ha > 0 else 0
 
         results.append({
@@ -131,20 +134,39 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
     status_text.empty()
 
     df = pd.DataFrame(results)
-    gdf = gdf.merge(df, left_index=True, right_on='id').set_index('id')
+    gdf_result = gdf.copy()
+    gdf_result = gdf_result.merge(df, left_index=True, right_on='id').set_index('id')
 
     st.success("¡Análisis completado!")
 
-    # --- MAPA ---
-    m = folium.Map(location=[gdf.geometry.centroid.y.mean(), gdf.geometry.centroid.x.mean()], zoom_start=14)
-    for _, r in gdf.iterrows():
-        color = "green" if r.ev_ha > 1.5 else "orange" if r.ev_ha > 0.8 else "red"
-        folium.Polygon(
-            locations=[(lat, lon) for lon, lat in r.geometry.exterior.coords],
-            popup=f"EV/ha: {r.ev_ha}<br>Días: {r.dias}<br>Biomasa: {r.biomasa_kg_ha} kg/ha",
-            color=color, fill=True, weight=2
-        ).add_to(m)
-    st_folium(m, width=700, height=500)
+    # --- MAPA SEGURO ---
+    if not gdf_result.empty:
+        center_y = gdf_result.geometry.centroid.y.mean()
+        center_x = gdf_result.geometry.centroid.x.mean()
+        m = folium.Map(location=[center_y, center_x], zoom_start=14)
+
+        for _, r in gdf_result.iterrows():
+            if r.geometry is None or r.geometry.is_empty:
+                continue
+            coords = []
+            if r.geometry.geom_type == 'Polygon':
+                coords = list(r.geometry.exterior.coords)
+            elif r.geometry.geom_type == 'MultiPolygon':
+                for poly in r.geometry.geoms:
+                    coords.extend(list(poly.exterior.coords))
+            else:
+                continue
+
+            color = "green" if r.ev_ha > 1.5 else "orange" if r.ev_ha > 0.8 else "red"
+            folium.Polygon(
+                locations=[(lat, lon) for lon, lat in coords],
+                popup=f"EV/ha: {r.ev_ha}<br>Días: {r.dias}<br>Biomasa: {r.biomasa_kg_ha} kg/ha",
+                color=color, fill=True, weight=2
+            ).add_to(m)
+
+        st_folium(m, width=700, height=500)
+    else:
+        st.warning("No hay geometrías válidas para mostrar en el mapa.")
 
     # --- TABLA ---
     st.subheader("Resultados")
@@ -155,7 +177,7 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
     with col1:
         st.download_button("CSV", df.to_csv(index=False), "resultados.csv", "text/csv")
     with col2:
-        st.download_button("GeoJSON", gdf.to_json(), "lotes.geojson", "application/json")
+        st.download_button("GeoJSON", gdf_result.to_json(), "lotes.geojson", "application/json")
 
     # --- RECOMENDACIONES ---
     st.subheader("Recomendaciones Regenerativas")
@@ -180,7 +202,7 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
         doc = Document()
         doc.add_heading('Informe Forrajero Regenerativo', 0)
         doc.add_paragraph(f"Fecha: {datetime.now().strftime('%d/%m/%Y')}")
-        doc.add_paragraph(f"Lotes: {len(gdf)} | Área: {df.area_ha.sum():.1f} ha")
+        doc.add_paragraph(f"Lotes: {len(gdf_result)} | Área: {df.area_ha.sum():.1f} ha")
         doc.add_paragraph(f"EV/ha promedio: {prom_ev:.2f} | Días: {prom_dias:.1f}")
         doc.add_paragraph("Recomendaciones:")
         for r in rec:
