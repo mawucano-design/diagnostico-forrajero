@@ -1,16 +1,23 @@
 credentials:
   usernames:
+    admin:
+      email: admin@tuempresa.com
+      name: Administrador
+      password: $2b$12$J9F8G7H6I5J4K3L2M1N0O.P9Q8R7S6T5U4V3W2X1Y0Z
     juan:
       email: juan@tuempresa.com
       name: Juan Pérez
+      password: $2b$12$XyZaBcDeFgHiJkLmNoPqRsTuVwXyZ1Y2X3W4V5U6T7S
     ana:
       email: ana@tuempresa.com
       name: Ana López
+      password: $2b$12$AbCdEfGhIjKlMnOpQrStUvWxYz1234567890abcdef
 cookie:
   expiry_days: 30
   key: regenerativo2025claveunica
   name: forrajero_regenerativo
 preauthorized:
   emails:
+    - admin@tuempresa.com
     - juan@tuempresa.com
     - ana@tuempresa.com
