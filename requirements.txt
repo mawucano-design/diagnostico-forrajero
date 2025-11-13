@@ -1,5 +1,5 @@
 streamlit>=1.28.0
-streamlit-authenticator==0.2.1  # Versión estable sin deprecations
+streamlit-authenticator==0.2.1  # Versión estable sin cambios
 geopandas>=0.13.0
 pandas>=2.0.0
 numpy>=1.24.0
