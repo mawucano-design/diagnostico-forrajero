@@ -23,7 +23,7 @@ try:
     # LEER SECRETS
     client_id = st.secrets.get("SENTINEL_HUB_CLIENT_ID", "").strip()
     client_secret = st.secrets.get("SENTINEL_HUB_CLIENT_SECRET", "").strip()
-    instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "").strip()
+   
 
     if not client_id or not client_secret:
         raise ValueError("Faltan CLIENT_ID o CLIENT_SECRET")
@@ -53,7 +53,7 @@ except Exception as e:
     st.code("""
 SENTINEL_HUB_CLIENT_ID = "358474d6-2326-4637-bf8e-30a709b2d6a6"
 SENTINEL_HUB_CLIENT_SECRET = "b296cf70-c9d2-4e69-91f4-f7be80b99ed1"
-SENTINEL_HUB_INSTANCE_ID = "PLAK81593ed161694ad48faa8065411d2539"
+
     """)
     st.stop()
 
