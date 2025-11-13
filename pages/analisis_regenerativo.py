@@ -17,19 +17,36 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="Análisis Regenerativo", layout="wide")
 st.title("Análisis Forrajero Regenerativo")
 
-# --- CREDENCIALES ---
+# --- CREDENCIALES CON VERIFICACIÓN RIGUROSA ---
 try:
     config = SHConfig()
-    config.sh_client_id = st.secrets["SENTINEL_HUB_CLIENT_ID"].strip()
-    config.sh_client_secret = st.secrets["SENTINEL_HUB_CLIENT_SECRET"].strip()
-    config.instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "").strip()
+    client_id = st.secrets.get("SENTINEL_HUB_CLIENT_ID", "").strip()
+    client_secret = st.secrets.get("SENTINEL_HUB_CLIENT_SECRET", "").strip()
+    instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "").strip()
+
+    if not client_id or not client_secret:
+        raise ValueError("Faltan CLIENT_ID o CLIENT_SECRET")
     
-    if not config.sh_client_id or not config.sh_client_secret:
-        raise ValueError("Faltan credenciales")
+    config.sh_client_id = client_id
+    config.sh_client_secret = client_secret
+    if instance_id:
+        config.instance_id = instance_id
+
+    # PRUEBA DE CONEXIÓN
+    test_request = SentinelHubRequest(
+        evalscript="return [1];",
+        input_data=[SentinelHubRequest.input_data(data_collection=DataCollection.SENTINEL2_L2A)],
+        responses=[SentinelHubRequest.output_response('default', MimeType.JSON)],
+        bbox=BBox((0, 0, 1, 1), crs=CRS.WGS84),
+        size=(1, 1),
+        config=config
+    )
+    test_request.get_data()  # Si falla, lanza excepción
     SH_OK = True
 except Exception as e:
     SH_OK = False
     st.error(f"Credenciales inválidas: {e}")
+    st.stop()
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -44,7 +61,7 @@ with st.sidebar:
 # --- CARGA SHAPEFILE ---
 uploaded = st.file_uploader("Subir ZIP con shapefile (.shp, .shx, .dbf, .prj)", type="zip")
 
-if uploaded and SH_OK:
+if uploaded:
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(uploaded) as z:
             z.extractall(tmp)
@@ -57,23 +74,23 @@ if uploaded and SH_OK:
         if gdf.crs is None:
             gdf = gdf.set_crs('EPSG:4326')
         gdf = gdf.to_crs('EPSG:4326')
-        gdf = gdf[gdf.geometry.notna()]  # Eliminar nulos
-        st.success(f"{len(gdf)} lotes válidos cargados")
+        gdf = gdf[gdf.geometry.notna() & gdf.geometry.is_valid]  # Solo válidas
+        st.success(f"{len(gdf)} lotes válidos")
 else:
     gdf = None
 
 # --- ANÁLISIS ---
-if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
+if gdf is not None and st.button("EJECUTAR ANÁLIS", type="primary"):
     progress_bar = st.progress(0)
     status_text = st.empty()
     results = []
 
     for idx, (i, row) in enumerate(gdf.iterrows()):
-        status_text.text(f"Procesando lote {i+1}/{len(gdf)}...")
+        status_text.text(f"Procesando lote {idx+1}/{len(gdf)}...")
         progress_bar.progress((idx + 1) / len(gdf))
 
         geom = row.geometry
-        if geom is None or geom.is_empty:
+        if geom is None or geom.is_empty or not geom.is_valid:
             ndvi_mean = 0.1
         else:
             bbox = BBox(geom.bounds, crs=CRS.WGS84)
@@ -112,7 +129,7 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
                 ndvi_values = response[..., 0][mask]
                 ndvi_mean = np.mean(ndvi_values) if len(ndvi_values) > 0 else 0.1
             except Exception as e:
-                st.warning(f"Lote {i+1}: sin datos → {e}")
+                st.warning(f"Lote {idx+1}: sin datos → {e}")
                 ndvi_mean = 0.1
 
         area_ha = geom.area / 10000 if geom else 0
@@ -134,45 +151,44 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
     status_text.empty()
 
     df = pd.DataFrame(results)
-    gdf_result = gdf.copy()
-    gdf_result = gdf_result.merge(df, left_index=True, right_on='id').set_index('id')
+    gdf_result = gdf.merge(df, left_index=True, right_on='id').set_index('id')
 
     st.success("¡Análisis completado!")
 
-    # --- MAPA SEGURO ---
+    # --- MAPA 100% SEGURO ---
     if not gdf_result.empty:
-        center_y = gdf_result.geometry.centroid.y.mean()
-        center_x = gdf_result.geometry.centroid.x.mean()
-        m = folium.Map(location=[center_y, center_x], zoom_start=14)
+        center = [gdf_result.geometry.centroid.y.mean(), gdf_result.geometry.centroid.x.mean()]
+        m = folium.Map(location=center, zoom_start=14)
 
         for _, r in gdf_result.iterrows():
             if r.geometry is None or r.geometry.is_empty:
                 continue
+
             coords = []
             if r.geometry.geom_type == 'Polygon':
                 coords = list(r.geometry.exterior.coords)
             elif r.geometry.geom_type == 'MultiPolygon':
                 for poly in r.geometry.geoms:
                     coords.extend(list(poly.exterior.coords))
-            else:
+
+            if not coords:
                 continue
 
             color = "green" if r.ev_ha > 1.5 else "orange" if r.ev_ha > 0.8 else "red"
             folium.Polygon(
-                locations=[(lat, lon) for lon, lat in coords],
+                locations=[(y, x) for x, y in coords],
                 popup=f"EV/ha: {r.ev_ha}<br>Días: {r.dias}<br>Biomasa: {r.biomasa_kg_ha} kg/ha",
                 color=color, fill=True, weight=2
             ).add_to(m)
 
         st_folium(m, width=700, height=500)
     else:
-        st.warning("No hay geometrías válidas para mostrar en el mapa.")
+        st.warning("No hay lotes para mostrar.")
 
-    # --- TABLA ---
+    # --- TABLA Y EXPORTES ---
     st.subheader("Resultados")
     st.dataframe(df.style.format({"area_ha": "{:.2f}", "ndvi": "{:.3f}", "ev_ha": "{:.2f}"}))
 
-    # --- EXPORTES ---
     col1, col2 = st.columns(2)
     with col1:
         st.download_button("CSV", df.to_csv(index=False), "resultados.csv", "text/csv")
@@ -180,38 +196,30 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
         st.download_button("GeoJSON", gdf_result.to_json(), "lotes.geojson", "application/json")
 
     # --- RECOMENDACIONES ---
-    st.subheader("Recomendaciones Regenerativas")
+    st.subheader("Recomendaciones")
     prom_ev = df['ev_ha'].mean()
     prom_dias = df['dias'].mean()
-
-    rec = []
-    if prom_dias < 30:
-        rec.append("**Descanso insuficiente** → Mínimo 30-45 días.")
-    if prom_ev > 2.0:
-        rec.append("**Carga alta** → Reducir EV/ha.")
-    if prom_ev < 0.8:
-        rec.append("**Baja productividad** → Leguminosas o compost.")
-    rec.append("**Rotación intensiva**: 1-3 días pastoreo + 30-60 descanso.")
-    rec.append("**Monitoreo mensual** con esta app.")
-
+    rec = [
+        f"**EV/ha promedio**: {prom_ev:.2f}",
+        f"**Días promedio**: {prom_dias:.1f}",
+        "**Rotación intensiva**: 1-3 días pastoreo + 30-60 descanso.",
+        "**Monitoreo mensual** con esta app."
+    ]
     for r in rec:
         st.markdown(f"- {r}")
 
-    # --- INFORME DOCX ---
+    # --- INFORME ---
     if st.button("Generar Informe DOCX"):
         doc = Document()
-        doc.add_heading('Informe Forrajero Regenerativo', 0)
+        doc.add_heading('Informe Forrajero', 0)
         doc.add_paragraph(f"Fecha: {datetime.now().strftime('%d/%m/%Y')}")
         doc.add_paragraph(f"Lotes: {len(gdf_result)} | Área: {df.area_ha.sum():.1f} ha")
-        doc.add_paragraph(f"EV/ha promedio: {prom_ev:.2f} | Días: {prom_dias:.1f}")
-        doc.add_paragraph("Recomendaciones:")
         for r in rec:
             doc.add_paragraph(r, style='List Bullet')
-
         buf = io.BytesIO()
         doc.save(buf)
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode()
-        href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="informe_regenerativo.docx">Descargar Informe</a>'
+        href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="informe.docx">Descargar</a>'
         st.markdown(href, unsafe_allow_html=True)
         st.success("Informe listo.")
