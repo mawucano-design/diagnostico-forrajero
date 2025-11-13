@@ -11,28 +11,31 @@ from sentinelhub import SHConfig, DataCollection, MimeType, CRS, BBox, SentinelH
 from docx import Document
 import io
 import base64
-import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Análisis Regenerativo", layout="wide")
 st.title("Análisis Forrajero Regenerativo")
 
-# --- CREDENCIALES CON VERIFICACIÓN RIGUROSA ---
+# --- VERIFICACIÓN RIGUROSA DE CREDENCIALES ---
+st.info("Verificando credenciales de Sentinel Hub...")
+
 try:
-    config = SHConfig()
+    # LEER SECRETS
     client_id = st.secrets.get("SENTINEL_HUB_CLIENT_ID", "").strip()
     client_secret = st.secrets.get("SENTINEL_HUB_CLIENT_SECRET", "").strip()
     instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "").strip()
 
     if not client_id or not client_secret:
         raise ValueError("Faltan CLIENT_ID o CLIENT_SECRET")
-    
+
+    # CONFIGURAR
+    config = SHConfig()
     config.sh_client_id = client_id
     config.sh_client_secret = client_secret
     if instance_id:
         config.instance_id = instance_id
 
-    # PRUEBA DE CONEXIÓN
+    # PRUEBA DE CONEXIÓN REAL
     test_request = SentinelHubRequest(
         evalscript="return [1];",
         input_data=[SentinelHubRequest.input_data(data_collection=DataCollection.SENTINEL2_L2A)],
@@ -41,11 +44,17 @@ try:
         size=(1, 1),
         config=config
     )
-    test_request.get_data()  # Si falla, lanza excepción
+    test_request.get_data()  # Si falla, lanza error
+    st.success("Credenciales válidas")
     SH_OK = True
 except Exception as e:
     SH_OK = False
     st.error(f"Credenciales inválidas: {e}")
+    st.code("""
+SENTINEL_HUB_CLIENT_ID = "358474d6-2326-4637-bf8e-30a709b2d6a6"
+SENTINEL_HUB_CLIENT_SECRET = "b296cf70-c9d2-4e69-91f4-f7be80b99ed1"
+SENTINEL_HUB_INSTANCE_ID = "PLAK81593ed161694ad48faa8065411d2539"
+    """)
     st.stop()
 
 # --- SIDEBAR ---
@@ -59,38 +68,34 @@ with st.sidebar:
     eficiencia = st.slider("Eficiencia pastoreo (%)", 40, 80, 55) / 100
 
 # --- CARGA SHAPEFILE ---
-uploaded = st.file_uploader("Subir ZIP con shapefile (.shp, .shx, .dbf, .prj)", type="zip")
+uploaded = st.file_uploader("Subir ZIP con shapefile", type="zip")
 
 if uploaded:
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(uploaded) as z:
             z.extractall(tmp)
-        shp_files = [f for f in os.listdir(tmp) if f.endswith('.shp')]
-        if not shp_files:
-            st.error("No se encontró .shp en el ZIP")
-            st.stop()
-        shp = shp_files[0]
+        shp = [f for f in os.listdir(tmp) if f.endswith('.shp')][0]
         gdf = gpd.read_file(f"{tmp}/{shp}")
         if gdf.crs is None:
             gdf = gdf.set_crs('EPSG:4326')
         gdf = gdf.to_crs('EPSG:4326')
-        gdf = gdf[gdf.geometry.notna() & gdf.geometry.is_valid]  # Solo válidas
+        gdf = gdf[gdf.geometry.notna() & gdf.geometry.is_valid]
         st.success(f"{len(gdf)} lotes válidos")
 else:
     gdf = None
 
 # --- ANÁLISIS ---
-if gdf is not None and st.button("EJECUTAR ANÁLIS", type="primary"):
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
+    progress = st.progress(0)
+    status = st.empty()
     results = []
 
     for idx, (i, row) in enumerate(gdf.iterrows()):
-        status_text.text(f"Procesando lote {idx+1}/{len(gdf)}...")
-        progress_bar.progress((idx + 1) / len(gdf))
+        status.text(f"Procesando lote {idx+1}/{len(gdf)}...")
+        progress.progress((idx + 1) / len(gdf))
 
         geom = row.geometry
-        if geom is None or geom.is_empty or not geom.is_valid:
+        if geom is None or geom.is_empty:
             ndvi_mean = 0.1
         else:
             bbox = BBox(geom.bounds, crs=CRS.WGS84)
@@ -98,16 +103,8 @@ if gdf is not None and st.button("EJECUTAR ANÁLIS", type="primary"):
 
             evalscript = """
             //VERSION=3
-            function setup() {
-                return {
-                    input: ["B04", "B08", "dataMask"],
-                    output: { bands: 4 }
-                };
-            }
-            function evaluatePixel(samples) {
-                let ndvi = (samples.B08 - samples.B04)/(samples.B08 + samples.B04 + 0.0001);
-                return [ndvi, ndvi, ndvi, samples.dataMask];
-            }
+            function setup() { return { input: ["B04", "B08", "dataMask"], output: { bands: 4 } }; }
+            function evaluatePixel(s) { let ndvi = (s.B08 - s.B04)/(s.B08 + s.B04 + 0.0001); return [ndvi, ndvi, ndvi, s.dataMask]; }
             """
 
             request = SentinelHubRequest(
@@ -129,7 +126,7 @@ if gdf is not None and st.button("EJECUTAR ANÁLIS", type="primary"):
                 ndvi_values = response[..., 0][mask]
                 ndvi_mean = np.mean(ndvi_values) if len(ndvi_values) > 0 else 0.1
             except Exception as e:
-                st.warning(f"Lote {idx+1}: sin datos → {e}")
+                st.warning(f"Lote {idx+1}: {e}")
                 ndvi_mean = 0.1
 
         area_ha = geom.area / 10000 if geom else 0
@@ -147,45 +144,36 @@ if gdf is not None and st.button("EJECUTAR ANÁLIS", type="primary"):
             'dias': round(dias, 1)
         })
 
-    progress_bar.empty()
-    status_text.empty()
+    progress.empty()
+    status.empty()
 
     df = pd.DataFrame(results)
     gdf_result = gdf.merge(df, left_index=True, right_on='id').set_index('id')
 
     st.success("¡Análisis completado!")
 
-    # --- MAPA 100% SEGURO ---
+    # --- MAPA ---
     if not gdf_result.empty:
-        center = [gdf_result.geometry.centroid.y.mean(), gdf_result.geometry.centroid.x.mean()]
-        m = folium.Map(location=center, zoom_start=14)
-
+        m = folium.Map(location=[gdf_result.geometry.centroid.y.mean(), gdf_result.geometry.centroid.x.mean()], zoom_start=14)
         for _, r in gdf_result.iterrows():
             if r.geometry is None or r.geometry.is_empty:
                 continue
-
             coords = []
             if r.geometry.geom_type == 'Polygon':
                 coords = list(r.geometry.exterior.coords)
             elif r.geometry.geom_type == 'MultiPolygon':
                 for poly in r.geometry.geoms:
                     coords.extend(list(poly.exterior.coords))
-
-            if not coords:
-                continue
-
-            color = "green" if r.ev_ha > 1.5 else "orange" if r.ev_ha > 0.8 else "red"
-            folium.Polygon(
-                locations=[(y, x) for x, y in coords],
-                popup=f"EV/ha: {r.ev_ha}<br>Días: {r.dias}<br>Biomasa: {r.biomasa_kg_ha} kg/ha",
-                color=color, fill=True, weight=2
-            ).add_to(m)
-
+            if coords:
+                color = "green" if r.ev_ha > 1.5 else "orange" if r.ev_ha > 0.8 else "red"
+                folium.Polygon(
+                    locations=[(y, x) for x, y in coords],
+                    popup=f"EV/ha: {r.ev_ha} | Días: {r.dias} | Biomasa: {r.biomasa_kg_ha} kg/ha",
+                    color=color, fill=True, weight=2
+                ).add_to(m)
         st_folium(m, width=700, height=500)
-    else:
-        st.warning("No hay lotes para mostrar.")
 
-    # --- TABLA Y EXPORTES ---
+    # --- RESULTADOS ---
     st.subheader("Resultados")
     st.dataframe(df.style.format({"area_ha": "{:.2f}", "ndvi": "{:.3f}", "ev_ha": "{:.2f}"}))
 
@@ -202,13 +190,12 @@ if gdf is not None and st.button("EJECUTAR ANÁLIS", type="primary"):
     rec = [
         f"**EV/ha promedio**: {prom_ev:.2f}",
         f"**Días promedio**: {prom_dias:.1f}",
-        "**Rotación intensiva**: 1-3 días pastoreo + 30-60 descanso.",
-        "**Monitoreo mensual** con esta app."
+        "**Rotación intensiva**: 1-3 días + 30-60 descanso",
+        "**Monitoreo mensual**"
     ]
     for r in rec:
         st.markdown(f"- {r}")
 
-    # --- INFORME ---
     if st.button("Generar Informe DOCX"):
         doc = Document()
         doc.add_heading('Informe Forrajero', 0)
