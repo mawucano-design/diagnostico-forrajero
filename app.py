@@ -18,7 +18,7 @@ authenticator = stauth.Authenticate(
     config.get('preauthorized', [])
 )
 
-# --- REGISTRO AUTOMÁTICO ---
+# --- REGISTRO AUTOMÁTICO (NUEVO FORMATO) ---
 with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     try:
         email = st.text_input("Email", key="reg_email")
@@ -30,6 +30,7 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
             
             if st.button("Crear cuenta"):
                 if password1 == password2 and len(password1) >= 6:
+                    # NUEVO FORMATO: Sin form_name, usa fields por default
                     if authenticator.register_user(username, name, email, password1):
                         st.success("Cuenta creada. Ahora inicia sesión.")
                         st.rerun()
@@ -44,7 +45,7 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
         st.error(f"Error: {e}")
 
 # --- LOGIN (NUEVO FORMATO) ---
-authenticator.login('Iniciar Sesión', 'main')
+authenticator.login('Iniciar Sesión')
 
 # Leer resultados del login desde session_state
 name = st.session_state.get('name')
