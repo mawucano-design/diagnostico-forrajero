@@ -13,8 +13,9 @@ from docx.shared import Inches
 import io
 import base64
 import streamlit.components.v1 as components
-from datetime import datetime, timedelta  # ← IMPORT FALTANTE
+from datetime import datetime, timedelta
 
+st.set_page_config(page_title="Análisis Regenerativo", layout="wide")
 st.title("Análisis Forrajero Regenerativo")
 
 # --- CREDENCIALES ---
@@ -24,26 +25,35 @@ try:
     config.sh_client_secret = st.secrets["SENTINEL_HUB_CLIENT_SECRET"]
     config.instance_id = st.secrets.get("SENTINEL_HUB_INSTANCE_ID", "")
     SH_OK = True
-except:
+except Exception as e:
     SH_OK = False
-    st.error("Configura credenciales en Secrets.")
+    st.error(f"Error en credenciales: {e}")
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("Parámetros")
     tipo_pastura = st.selectbox("Pastura", ["Alfalfa", "Raygrass", "Festuca", "Natural"])
-    fecha = st.date_input("Fecha imagen", max_value=datetime.now())
+    
+    # Fecha con valor por defecto
+    default_date = datetime.now().date()
+    fecha = st.date_input("Fecha imagen", value=default_date, max_value=default_date)
+    
     nubes = st.slider("Nubes máx (%)", 0, 100, 20)
     peso_vaca = st.slider("Peso promedio (kg)", 400, 600, 500)
     eficiencia = st.slider("Eficiencia pastoreo (%)", 40, 80, 55) / 100
 
 # --- CARGA SHAPEFILE ---
-uploaded = st.file_uploader("Subir ZIP con shapefile", type="zip")
+uploaded = st.file_uploader("Subir ZIP con shapefile (.shp, .shx, .dbf, .prj)", type="zip")
+
 if uploaded and SH_OK:
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(uploaded) as z:
             z.extractall(tmp)
-        shp = [f for f in os.listdir(tmp) if f.endswith('.shp')][0]
+        shp_files = [f for f in os.listdir(tmp) if f.endswith('.shp')]
+        if not shp_files:
+            st.error("No se encontró .shp en el ZIP")
+            st.stop()
+        shp = shp_files[0]
         gdf = gpd.read_file(f"{tmp}/{shp}")
         if gdf.crs is None:
             gdf = gdf.set_crs('EPSG:4326')
@@ -54,63 +64,74 @@ else:
 
 # --- ANÁLISIS ---
 if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
-    with st.spinner("Procesando Sentinel-2..."):
-        results = []
-        for idx, row in gdf.iterrows():
-            geom = row.geometry
-            bbox = BBox(geom.bounds, crs=CRS.WGS84)
-            size = bbox_to_dimensions(bbox, resolution=10)
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    results = []
 
-            evalscript = """
-            //VERSION=3
-            function setup() {
-                return {
-                    input: ["B04", "B08", "dataMask"],
-                    output: { bands: 4 }
-                };
-            }
-            function evaluatePixel(samples) {
-                let ndvi = (samples.B08 - samples.B04)/(samples.B08 + samples.B04);
-                return [ndvi, ndvi, ndvi, samples.dataMask];
-            }
-            """
+    for idx, (i, row) in enumerate(gdf.iterrows()):
+        status_text.text(f"Procesando lote {i+1}/{len(gdf)}...")
+        progress_bar.progress((idx + 1) / len(gdf))
 
-            request = SentinelHubRequest(
-                evalscript=evalscript,
-                input_data=[SentinelHubRequest.input_data(
-                    data_collection=DataCollection.SENTINEL2_L2A,
-                    time_interval=(str(fecha), str(fecha + timedelta(days=1))),
-                    other_args={"cloudCoverage": nubes}
-                )],
-                responses=[SentinelHubRequest.output_response('default', MimeType.TIFF)],
-                bbox=bbox,
-                size=size,
-                config=config
-            )
+        geom = row.geometry
+        bbox = BBox(geom.bounds, crs=CRS.WGS84)
+        size = bbox_to_dimensions(bbox, resolution=10)
 
-            try:
-                response = request.get_data()[0]
-                ndvi_mean = np.mean(response[response != 0]) if np.any(response != 0) else 0.1
-            except:
-                ndvi_mean = 0.1
+        evalscript = """
+        //VERSION=3
+        function setup() {
+            return {
+                input: ["B04", "B08", "dataMask"],
+                output: { bands: 4 }
+            };
+        }
+        function evaluatePixel(samples) {
+            let ndvi = (samples.B08 - samples.B04)/(samples.B08 + samples.B04 + 0.0001);
+            return [ndvi, ndvi, ndvi, samples.dataMask];
+        }
+        """
 
-            area_ha = geom.area / 10000
-            biomasa = ndvi_mean * 4000 if ndvi_mean > 0.3 else 1000
-            consumo_dia = peso_vaca * 0.025 * eficiencia
-            ev_ha = biomasa / (consumo_dia * 30)
-            dias = biomasa / (ev_ha * consumo_dia) if ev_ha > 0 else 0
+        request = SentinelHubRequest(
+            evalscript=evalscript,
+            input_data=[SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A,
+                time_interval=(str(fecha), str(fecha + timedelta(days=1))),
+                other_args={"maxcc": nubes / 100}
+            )],
+            responses=[SentinelHubRequest.output_response('default', MimeType.TIFF)],
+            bbox=bbox,
+            size=size,
+            config=config
+        )
 
-            results.append({
-                'id': idx,
-                'area_ha': round(area_ha, 2),
-                'ndvi': round(ndvi_mean, 3),
-                'biomasa_kg_ha': int(biomasa),
-                'ev_ha': round(ev_ha, 2),
-                'dias': round(dias, 1)
-            })
+        try:
+            response = request.get_data()[0]
+            mask = response[..., 3] == 1
+            ndvi_values = response[..., 0][mask]
+            ndvi_mean = np.mean(ndvi_values) if len(ndvi_values) > 0 else 0.1
+        except Exception as e:
+            st.warning(f"Lote {i+1}: sin datos → {e}")
+            ndvi_mean = 0.1
 
-        df = pd.DataFrame(results)
-        gdf = gdf.merge(df, left_index=True, right_on='id')
+        area_ha = geom.area / 10000
+        biomasa = max(ndvi_mean * 4000, 1000) if ndvi_mean > 0.3 else 1000
+        consumo_dia = peso_vaca * 0.025 * eficiencia
+        ev_ha = biomasa / (consumo_dia * 30)
+        dias = biomasa / (consumo_dia * ev_ha) if ev_ha > 0 else 0
+
+        results.append({
+            'id': i,
+            'area_ha': round(area_ha, 2),
+            'ndvi': round(ndvi_mean, 3),
+            'biomasa_kg_ha': int(biomasa),
+            'ev_ha': round(ev_ha, 2),
+            'dias': round(dias, 1)
+        })
+
+    progress_bar.empty()
+    status_text.empty()
+
+    df = pd.DataFrame(results)
+    gdf = gdf.merge(df, left_index=True, right_on='id').set_index('id')
 
     st.success("¡Análisis completado!")
 
@@ -136,21 +157,20 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
     with col2:
         st.download_button("GeoJSON", gdf.to_json(), "lotes.geojson", "application/json")
 
-    # --- RECOMENDACIONES REGENERATIVAS ---
-    st.subheader("Recomendaciones de Ganadería Regenerativa")
+    # --- RECOMENDACIONES ---
+    st.subheader("Recomendaciones Regenerativas")
     prom_ev = df['ev_ha'].mean()
     prom_dias = df['dias'].mean()
 
     rec = []
     if prom_dias < 30:
-        rec.append("**Descanso insuficiente** → Extender a **mínimo 30-45 días** por lote.")
+        rec.append("**Descanso insuficiente** → Mínimo 30-45 días.")
     if prom_ev > 2.0:
-        rec.append("**Carga alta** → Reducir EV/ha para evitar sobrepastoreo.")
+        rec.append("**Carga alta** → Reducir EV/ha.")
     if prom_ev < 0.8:
-        rec.append("**Baja productividad** → Considerar siembra de leguminosas o fertilización orgánica.")
-    rec.append("**Rotación intensiva**: 1-3 días de pastoreo + 30-60 días de descanso.")
-    rec.append("**Biodiversidad**: Incluir especies forrajeras mixtas.")
-    rec.append("**Monitoreo continuo**: Usar esta app mensualmente.")
+        rec.append("**Baja productividad** → Leguminosas o compost.")
+    rec.append("**Rotación intensiva**: 1-3 días pastoreo + 30-60 descanso.")
+    rec.append("**Monitoreo mensual** con esta app.")
 
     for r in rec:
         st.markdown(f"- {r}")
@@ -160,8 +180,8 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
         doc = Document()
         doc.add_heading('Informe Forrajero Regenerativo', 0)
         doc.add_paragraph(f"Fecha: {datetime.now().strftime('%d/%m/%Y')}")
-        doc.add_paragraph(f"Lotes: {len(gdf)} | Área total: {df.area_ha.sum():.1f} ha")
-        doc.add_paragraph(f"EV/ha promedio: {prom_ev:.2f} | Días promedio: {prom_dias:.1f}")
+        doc.add_paragraph(f"Lotes: {len(gdf)} | Área: {df.area_ha.sum():.1f} ha")
+        doc.add_paragraph(f"EV/ha promedio: {prom_ev:.2f} | Días: {prom_dias:.1f}")
         doc.add_paragraph("Recomendaciones:")
         for r in rec:
             doc.add_paragraph(r, style='List Bullet')
@@ -170,6 +190,6 @@ if gdf is not None and st.button("EJECUTAR ANÁLISIS", type="primary"):
         doc.save(buf)
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode()
-        html = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="informe_regenerativo.docx" id="dl">Descargar</a><script>document.getElementById("dl").click();</script>'
-        components.html(html, height=0)
-        st.success("Informe descargado.")
+        href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="informe_regenerativo.docx">Descargar Informe</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        st.success("Informe listo.")
