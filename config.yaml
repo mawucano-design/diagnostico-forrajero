@@ -14,7 +14,7 @@ credentials:
       password: $2b$12$SPxwWIpTHNHO7AtzucoXyu9U0Ia1Xj8SDC9sT.DtwOOFDDgtR8l7m
 cookie:
   expiry_days: 30
-  key: regenerativo2025claveunica
+  key: regenerativo2025claveunica123456789  # ← Clave única y larga
   name: forrajero_regenerativo
 preauthorized:
   emails:
