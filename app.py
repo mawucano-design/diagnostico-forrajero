@@ -43,8 +43,17 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- LOGIN CORRECTO ---
-authenticator.login('Iniciar Sesión', 'main')
+# --- LOGIN CON FIELDS (PARA 0.2.1) ---
+authenticator.login(
+    form_name='Iniciar Sesión',
+    location='main',
+    fields={
+        'Form name': 'Iniciar Sesión',
+        'Username': 'Username',
+        'Password': 'Contraseña',
+        'Login': 'Entrar'
+    }
+)
 
 # Leer estado
 name = st.session_state.get('name')
@@ -60,6 +69,6 @@ if authentication_status:
     st.info('Ve al menú → **Análisis Regenerativo**')
 
 elif authentication_status == False:
-    st.error('Email o contraseña incorrectos.')
+    st.error('Username o contraseña incorrectos.')
 elif authentication_status is None:
     st.warning('Por favor, inicia sesión o regístrate.')
