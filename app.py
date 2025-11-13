@@ -43,14 +43,10 @@ with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- LOGIN CORRECTO PARA 0.2.1 (ETIQUETAS EN INGLÉS) ---
-authenticator.login('Iniciar Sesión', location='main', fields={
-    'usernames': 'Username',
-    'password': 'Password',
-    'Log in': 'Entrar'
-})
+# --- LOGIN SIMPLE PARA v0.2.1 (SIN FIELDS) ---
+authenticator.login('Iniciar Sesión', 'main')
 
-# Leer estado
+# Leer estado del login desde session_state (v0.2.1 no retorna valores)
 name = st.session_state.get('name')
 authentication_status = st.session_state.get('authentication_status')
 username = st.session_state.get('username')
