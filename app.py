@@ -44,13 +44,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Sistema de autenticación simple
-def check_authentication():
+# =============================================================================
+# INICIALIZACIÓN COMPLETA DEL SESSION STATE
+# =============================================================================
+
+def initialize_session_state():
+    """Inicializa todas las variables del session state"""
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     if 'username' not in st.session_state:
         st.session_state.username = ""
-    
+    if 'gdf_cargado' not in st.session_state:
+        st.session_state.gdf_cargado = None
+    if 'gdf_analizado' not in st.session_state:
+        st.session_state.gdf_analizado = None
+    if 'sh_client_id' not in st.session_state:
+        st.session_state.sh_client_id = None
+    if 'sh_client_secret' not in st.session_state:
+        st.session_state.sh_client_secret = None
+    if 'sh_configured' not in st.session_state:
+        st.session_state.sh_configured = False
+
+# Sistema de autenticación simple
+def check_authentication():
+    """Verifica las credenciales de autenticación"""
     # Credenciales por defecto (en producción usar variables de entorno)
     default_users = {
         "admin": hashlib.sha256("password123".encode()).hexdigest(),
@@ -61,6 +78,7 @@ def check_authentication():
     return default_users
 
 def login_section():
+    """Sección de login"""
     st.title("🔐 Inicio de Sesión - Analizador Forrajero")
     st.markdown("---")
     
@@ -171,17 +189,14 @@ class SentinelHubProcessor:
         """Obtiene NDVI real desde Sentinel Hub o simula datos"""
         try:
             if not self.sh_config.available:
-                st.info("🔄 Usando datos simulados - Sentinel Hub no configurado")
                 return self._simular_ndvi_response(geometry)
                 
             # Aquí iría el código real para conectar con Sentinel Hub
             # Por ahora simulamos la respuesta
-            st.success("🛰️ Obteniendo datos de Sentinel Hub...")
             return self._simular_ndvi_response(geometry)
             
         except Exception as e:
             st.error(f"Error obteniendo NDVI de Sentinel Hub: {e}")
-            st.info("🔄 Volviendo a modo simulado")
             return self._simular_ndvi_response(geometry)
     
     def _simular_ndvi_response(self, geometry):
@@ -948,6 +963,9 @@ def crear_mapa_detallado(gdf_analizado, tipo_pastura):
 # =============================================================================
 
 def main():
+    # INICIALIZAR SESSION STATE PRIMERO
+    initialize_session_state()
+    
     if not st.session_state.authenticated:
         login_section()
     else:
