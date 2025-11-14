@@ -391,28 +391,11 @@ def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura, parametros_pe
     return gdf_analizado
 
 # =============================================================================
-# FUNCIONES DE MAPAS UNIFICADAS - MEJORADAS CON LEYENDAS DETALLADAS
+# FUNCIONES DE MAPAS UNIFICADAS - LEYENDAS CLARAS Y VISIBLES
 # =============================================================================
 
-MAPAS_BASE = {
-    "ESRI World Imagery": {
-        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        "attribution": "Esri, Maxar, Earthstar Geographics",
-        "name": "ESRI Satellite"
-    },
-    "ESRI World Street Map": {
-        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-        "attribution": "Esri, HERE, Garmin",
-        "name": "ESRI Streets"
-    },
-    "OpenStreetMap": {
-        "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "attribution": "OpenStreetMap contributors",
-        "name": "OSM"
-    }
-}
-
 def crear_mapa_base(gdf, mapa_seleccionado="ESRI World Imagery", zoom_start=10):
+    """Crea el mapa base con controles"""
     if not FOLIUM_AVAILABLE or gdf is None:
         return None
         
@@ -427,19 +410,38 @@ def crear_mapa_base(gdf, mapa_seleccionado="ESRI World Imagery", zoom_start=10):
         control_scale=True
     )
     
-    for nombre, config in MAPAS_BASE.items():
-        folium.TileLayer(
-            tiles=config["url"],
-            attr=config["attribution"],
-            name=config["name"],
-            control=True,
-            show=(nombre == mapa_seleccionado)
-        ).add_to(m)
+    # Capas base
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri, Maxar, Earthstar Geographics",
+        name="🌍 Satélite",
+        control=True,
+        show=(mapa_seleccionado == "ESRI World Imagery")
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri, HERE, Garmin",
+        name="🗺️ Calles",
+        control=True,
+        show=(mapa_seleccionado == "ESRI World Street Map")
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attr="OpenStreetMap contributors",
+        name="🗾 OpenStreetMap",
+        control=True,
+        show=(mapa_seleccionado == "OpenStreetMap")
+    ).add_to(m)
+    
+    # Control de capas
+    folium.LayerControl().add_to(m)
     
     return m
 
 def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de NDVI con leyenda mejorada y más detallada"""
+    """Crea mapa interactivo de NDVI con leyenda CLARA y visible"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -482,47 +484,67 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda MEJORADA con más categorías
+    # LEYENDA CLARA Y VISIBLE para NDVI
     legend_html = '''
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 250px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:11px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+    <div style="
+        position: fixed; 
+        bottom: 20px; 
+        left: 20px; 
+        width: 280px; 
+        height: auto;
+        background-color: white; 
+        border: 3px solid #2E8B57;
+        z-index: 9999; 
+        font-size: 12px; 
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        font-family: Arial, sans-serif;
+    ">
+        <div style="
+            font-weight: bold; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #2E8B57;
+            background-color: #f0fff0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #2E8B57;
+        ">
             🌿 ÍNDICE NDVI - ESTADO VEGETATIVO
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #8B4513; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>&lt; 0.1 - Suelo desnudo</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #8B4513; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">&lt; 0.1</span> - Suelo desnudo
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #CD853F; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.1-0.2 - Muy escasa</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #CD853F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.1-0.2</span> - Muy escasa
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FFD700; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.2-0.3 - Escasa</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #FFD700; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.2-0.3</span> - Escasa
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #ADFF2F; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.3-0.4 - Regular</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #ADFF2F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.3-0.4</span> - Regular
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #32CD32; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.4-0.5 - Buena</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #32CD32; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.4-0.5</span> - Buena
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #228B22; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.5-0.6 - Muy Buena</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #228B22; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.5-0.6</span> - Muy Buena
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #006400; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.6-0.7 - Excelente</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #006400; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.6-0.7</span> - Excelente
         </div>
         <div style="display: flex; align-items: center;">
-            <div style="width: 18px; height: 12px; background: #004d00; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>&gt; 0.7 - Óptima</span>
+            <div style="width: 20px; height: 15px; background: #004d00; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">&gt; 0.7</span> - Óptima
         </div>
     </div>
     '''
@@ -531,7 +553,7 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de EV/ha con leyenda mejorada y más realista"""
+    """Crea mapa interactivo de EV/ha con leyenda CLARA y visible"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -572,43 +594,63 @@ def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda MEJORADA con rangos más realistas
+    # LEYENDA CLARA Y VISIBLE para EV/ha
     legend_html = '''
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 220px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:11px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+    <div style="
+        position: fixed; 
+        bottom: 20px; 
+        left: 20px; 
+        width: 260px; 
+        height: auto;
+        background-color: white; 
+        border: 3px solid #2E8B57;
+        z-index: 9999; 
+        font-size: 12px; 
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        font-family: Arial, sans-serif;
+    ">
+        <div style="
+            font-weight: bold; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #2E8B57;
+            background-color: #f0fff0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #2E8B57;
+        ">
             🐄 CAPACIDAD DE CARGA (EV/ha)
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FF4444; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>&lt; 0.3 - Muy Baja</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #FF4444; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">&lt; 0.3</span> - Muy Baja
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FF6B6B; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.3-0.8 - Baja</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.3-0.8</span> - Baja
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FFA726; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>0.8-1.5 - Moderada Baja</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #FFA726; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">0.8-1.5</span> - Moderada Baja
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FFD54F; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>1.5-2.5 - Moderada</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #FFD54F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">1.5-2.5</span> - Moderada
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #9CCC65; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>2.5-3.5 - Buena</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #9CCC65; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">2.5-3.5</span> - Buena
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #66BB6A; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>3.5-5.0 - Muy Buena</span>
+        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+            <div style="width: 20px; height: 15px; background: #66BB6A; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">3.5-5.0</span> - Muy Buena
         </div>
         <div style="display: flex; align-items: center;">
-            <div style="width: 18px; height: 12px; background: #2E7D32; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>&gt; 5.0 - Excelente</span>
+            <div style="width: 20px; height: 15px; background: #2E7D32; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <span style="font-weight: bold;">&gt; 5.0</span> - Excelente
         </div>
     </div>
     '''
@@ -617,7 +659,7 @@ def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de disponibilidad forrajera con leyenda mejorada"""
+    """Crea mapa interactivo de disponibilidad forrajera con leyenda CLARA y visible"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -652,31 +694,63 @@ def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda MEJORADA con valores específicos
+    # LEYENDA CLARA Y VISIBLE para Disponibilidad
     legend_html = '''
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 280px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:11px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+    <div style="
+        position: fixed; 
+        bottom: 20px; 
+        left: 20px; 
+        width: 300px; 
+        height: auto;
+        background-color: white; 
+        border: 3px solid #2E8B57;
+        z-index: 9999; 
+        font-size: 12px; 
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        font-family: Arial, sans-serif;
+    ">
+        <div style="
+            font-weight: bold; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #2E8B57;
+            background-color: #f0fff0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #2E8B57;
+        ">
             📊 DISPONIBILIDAD FORRAJERA
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #D32F2F; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🔴 MUY BAJA (&lt; 800 kg MS/ha)</span>
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #ffebee; border-radius: 4px;">
+            <div style="width: 20px; height: 15px; background: #D32F2F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #D32F2F;">🔴 MUY BAJA</span><br>
+                <span style="font-size: 11px;">&lt; 800 kg MS/ha</span>
+            </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FF5252; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🟠 BAJA (800-2000 kg MS/ha)</span>
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #fff3e0; border-radius: 4px;">
+            <div style="width: 20px; height: 15px; background: #FF5252; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #FF9800;">🟠 BAJA</span><br>
+                <span style="font-size: 11px;">800-2000 kg MS/ha</span>
+            </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FFEB3B; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🟡 MEDIA (2000-3500 kg MS/ha)</span>
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #fffde7; border-radius: 4px;">
+            <div style="width: 20px; height: 15px; background: #FFEB3B; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #FFC107;">🟡 MEDIA</span><br>
+                <span style="font-size: 11px;">2000-3500 kg MS/ha</span>
+            </div>
         </div>
-        <div style="display: flex; align-items: center;">
-            <div style="width: 18px; height: 12px; background: #4CAF50; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🟢 ALTA (&gt; 3500 kg MS/ha)</span>
+        <div style="display: flex; align-items: center; padding: 4px; background-color: #e8f5e8; border-radius: 4px;">
+            <div style="width: 20px; height: 15px; background: #4CAF50; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #4CAF50;">🟢 ALTA</span><br>
+                <span style="font-size: 11px;">&gt; 3500 kg MS/ha</span>
+            </div>
         </div>
     </div>
     '''
@@ -685,7 +759,7 @@ def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo con recomendaciones agroecológicas con leyenda mejorada"""
+    """Crea mapa interactivo con recomendaciones agroecológicas con leyenda CLARA y visible"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -726,31 +800,63 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda de recomendaciones MEJORADA
+    # LEYENDA CLARA Y VISIBLE para Recomendaciones
     legend_html = '''
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 300px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:11px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+    <div style="
+        position: fixed; 
+        bottom: 20px; 
+        left: 20px; 
+        width: 320px; 
+        height: auto;
+        background-color: white; 
+        border: 3px solid #2E8B57;
+        z-index: 9999; 
+        font-size: 12px; 
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        font-family: Arial, sans-serif;
+    ">
+        <div style="
+            font-weight: bold; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #2E8B57;
+            background-color: #f0fff0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #2E8B57;
+        ">
             🌱 RECOMENDACIONES AGROECOLÓGICAS
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #D32F2F; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🔴 INTERVENCIÓN URGENTE</span>
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #ffebee; border-radius: 4px; border-left: 4px solid #D32F2F;">
+            <div style="width: 20px; height: 15px; background: #D32F2F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #D32F2F;">🔴 INTERVENCIÓN URGENTE</span><br>
+                <span style="font-size: 11px;">Disponibilidad &lt; 800 kg MS/ha</span>
+            </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FF9800; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🟠 MANEJO INTENSIVO</span>
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #fff3e0; border-radius: 4px; border-left: 4px solid #FF9800;">
+            <div style="width: 20px; height: 15px; background: #FF9800; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #FF9800;">🟠 MANEJO INTENSIVO</span><br>
+                <span style="font-size: 11px;">Disponibilidad 800-2000 kg MS/ha</span>
+            </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 18px; height: 12px; background: #FFEB3B; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🟡 MANEJO CUIDADOSO</span>
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #fffde7; border-radius: 4px; border-left: 4px solid #FFEB3B;">
+            <div style="width: 20px; height: 15px; background: #FFEB3B; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #FFC107;">🟡 MANEJO CUIDADOSO</span><br>
+                <span style="font-size: 11px;">Disponibilidad 2000-3500 kg MS/ha</span>
+            </div>
         </div>
-        <div style="display: flex; align-items: center;">
-            <div style="width: 18px; height: 12px; background: #4CAF50; border: 1px solid #000; margin-right: 6px;"></div>
-            <span>🟢 MANTENIMIENTO</span>
+        <div style="display: flex; align-items: center; padding: 6px; background-color: #e8f5e8; border-radius: 4px; border-left: 4px solid #4CAF50;">
+            <div style="width: 20px; height: 15px; background: #4CAF50; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
+            <div>
+                <span style="font-weight: bold; color: #4CAF50;">🟢 MANTENIMIENTO</span><br>
+                <span style="font-size: 11px;">Disponibilidad &gt; 3500 kg MS/ha</span>
+            </div>
         </div>
     </div>
     '''
@@ -1340,7 +1446,7 @@ def main_application():
             st.subheader("🗺️ Vista Previa del Potrero")
             mapa_preview = crear_mapa_base(gdf)
             if mapa_preview:
-                # Agregar polígono al mapa - CORREGIDO
+                # Agregar polígono al mapa
                 folium.GeoJson(
                     gdf.__geo_interface__,
                     style_function=lambda x: {'fillColor': '#3388ff', 'color': 'blue', 'weight': 2, 'fillOpacity': 0.3}
@@ -1392,7 +1498,7 @@ def main_application():
         """)
 
 def mostrar_resultados_completos(gdf_analizado, config):
-    """Muestra resultados completos del análisis - MEJORADO"""
+    """Muestra resultados completos del análisis con mapas mejorados"""
     st.header("📊 RESULTADOS DEL ANÁLISIS COMPLETO")
     
     # Métricas principales mejoradas
@@ -1435,48 +1541,61 @@ def mostrar_resultados_completos(gdf_analizado, config):
         alta = distribucion.get('ALTA', 0)
         st.metric("🟢 Alta", f"{alta} sub-lotes")
     
-    # Mapas de resultados - AHORA FUNCIONALES
+    # Mapas de resultados - CON LEYENDAS CLARAS
     if FOLIUM_AVAILABLE:
         st.header("🗺️ VISUALIZACIÓN INTERACTIVA")
+        
+        # Selector de mapa base
+        col_map1, col_map2 = st.columns([3, 1])
+        with col_map2:
+            mapa_base_seleccionado = st.selectbox(
+                "Mapa Base:",
+                ["ESRI World Imagery", "ESRI World Street Map", "OpenStreetMap"],
+                key="mapa_base_selector"
+            )
         
         # Pestañas con mapas funcionales
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "🌿 NDVI", 
             "🐄 EV/ha", 
             "📊 Disponibilidad",
-            "🌱 Recomendaciones Agroecológicas",
+            "🌱 Recomendaciones",
             "📋 Resumen"
         ])
         
         with tab1:
             st.subheader("🌿 ÍNDICE NDVI - ESTADO VEGETATIVO")
-            mapa_ndvi = crear_mapa_ndvi(gdf_analizado)
+            st.info("💡 **Interpretación NDVI:** Valores más altos indican mejor estado de la vegetación")
+            mapa_ndvi = crear_mapa_ndvi(gdf_analizado, mapa_base_seleccionado)
             if mapa_ndvi:
-                folium_static(mapa_ndvi, width=800, height=500)
+                folium_static(mapa_ndvi, width=800, height=600)
             else:
                 st.warning("No se pudo generar el mapa de NDVI")
         
         with tab2:
             st.subheader("🐄 CAPACIDAD DE CARGA - EV/HA")
-            mapa_ev = crear_mapa_ev_ha(gdf_analizado)
+            st.info("💡 **Interpretación EV/ha:** Número de animales que puede sostener cada hectárea")
+            mapa_ev = crear_mapa_ev_ha(gdf_analizado, mapa_base_seleccionado)
             if mapa_ev:
-                folium_static(mapa_ev, width=800, height=500)
+                folium_static(mapa_ev, width=800, height=600)
             else:
                 st.warning("No se pudo generar el mapa de EV/ha")
         
         with tab3:
             st.subheader("📊 DISPONIBILIDAD FORRAJERA")
-            mapa_disp = crear_mapa_disponibilidad(gdf_analizado)
+            st.info("💡 **Interpretación:** Cantidad de forraje disponible para el consumo animal")
+            mapa_disp = crear_mapa_disponibilidad(gdf_analizado, mapa_base_seleccionado)
             if mapa_disp:
-                folium_static(mapa_disp, width=800, height=500)
+                folium_static(mapa_disp, width=800, height=600)
             else:
                 st.warning("No se pudo generar el mapa de disponibilidad")
         
         with tab4:
             st.subheader("🌱 RECOMENDACIONES AGROECOLÓGICAS")
-            mapa_recom = crear_mapa_recomendaciones(gdf_analizado)
+            st.info("💡 **Interpretación:** Acciones sugeridas según el estado forrajero")
+            mapa_recom = crear_mapa_recomendaciones(gdf_analizado, mapa_base_seleccionado)
             if mapa_recom:
-                folium_static(mapa_recom, width=800, height=500)
+                folium_static(mapa_recom, width=800, height=600)
             else:
                 st.warning("No se pudo generar el mapa de recomendaciones")
             
@@ -1516,7 +1635,7 @@ def mostrar_resultados_completos(gdf_analizado, config):
     else:
         st.warning("⚠️ Folium no está disponible. Los mapas interactivos no se mostrarán.")
     
-    # Exportar datos - CORREGIDO (sin duplicación de botones)
+    # Exportar datos
     st.header("💾 EXPORTAR RESULTADOS")
     col_exp1, col_exp2, col_exp3 = st.columns(3)
     
@@ -1533,7 +1652,7 @@ def mostrar_resultados_completos(gdf_analizado, config):
             csv,
             f"resultados_completos_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             "text/csv",
-            key="download_csv_unique"  # Key única
+            key="download_csv_unique"
         )
     
     with col_exp2:
@@ -1544,7 +1663,7 @@ def mostrar_resultados_completos(gdf_analizado, config):
             geojson,
             f"resultados_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson",
             "application/json",
-            key="download_geojson_unique"  # Key única
+            key="download_geojson_unique"
         )
     
     with col_exp3:
@@ -1560,7 +1679,7 @@ def mostrar_resultados_completos(gdf_analizado, config):
                         data=informe_buffer.getvalue(),
                         file_name=f"informe_forrajero_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key="download_docx_unique"  # Key única
+                        key="download_docx_unique"
                     )
                 else:
                     st.error("Error generando informe DOCX")
