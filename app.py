@@ -108,14 +108,6 @@ if not st.session_state.authenticated:
     login_section()
     st.stop()
 
-# ---------- Parámetros por defecto ----------
-ms_optimo = 4000
-crecimiento_diario = 80
-consumo_porcentaje = 0.025
-tasa_utilizacion = 0.55
-umbral_ndvi_suelo = 0.15
-umbral_ndvi_pastura = 0.6
-
 # -----------------------
 # SIDEBAR (CONFIGURACIÓN)
 # -----------------------
@@ -159,18 +151,46 @@ with st.sidebar:
     umbral_ndvi_optimo = st.slider("Umbral NDVI vegetación óptima:", 0.4, 0.8, 0.6, 0.01)
     sensibilidad_suelo = st.slider("Sensibilidad detección suelo:", 0.1, 1.0, 0.5, 0.1)
 
+    # PARÁMETROS FORRAJEROS POR DEFECTO SEGÚN TIPO DE PASTURA
+    if tipo_pastura == "ALFALFA":
+        ms_optimo = 5000
+        crecimiento_diario = 100
+        consumo_porcentaje = 0.03
+        tasa_utilizacion = 0.65
+    elif tipo_pastura == "RAYGRASS":
+        ms_optimo = 4500
+        crecimiento_diario = 90
+        consumo_porcentaje = 0.028
+        tasa_utilizacion = 0.60
+    elif tipo_pastura == "FESTUCA":
+        ms_optimo = 4000
+        crecimiento_diario = 70
+        consumo_porcentaje = 0.025
+        tasa_utilizacion = 0.55
+    elif tipo_pastura == "AGROPIRRO":
+        ms_optimo = 3500
+        crecimiento_diario = 60
+        consumo_porcentaje = 0.022
+        tasa_utilizacion = 0.50
+    elif tipo_pastura == "PASTIZAL_NATURAL":
+        ms_optimo = 3000
+        crecimiento_diario = 40
+        consumo_porcentaje = 0.020
+        tasa_utilizacion = 0.45
+    else:  # PERSONALIZADO
+        ms_optimo = 4000
+        crecimiento_diario = 80
+        consumo_porcentaje = 0.025
+        tasa_utilizacion = 0.55
+
     if tipo_pastura == "PERSONALIZADO":
         st.subheader("📊 Parámetros Forrajeros Personalizados")
-        ms_optimo = st.number_input("Biomasa Óptima (kg MS/ha):", min_value=1000, max_value=10000, value=4000)
-        crecimiento_diario = st.number_input("Crecimiento Diario (kg MS/ha/día):", min_value=10, max_value=300, value=80)
+        ms_optimo = st.number_input("Biomasa Óptima (kg MS/ha):", min_value=1000, max_value=10000, value=ms_optimo)
+        crecimiento_diario = st.number_input("Crecimiento Diario (kg MS/ha/día):", min_value=10, max_value=300, value=crecimiento_diario)
         consumo_porcentaje = st.number_input("Consumo (% peso vivo):", min_value=0.01, max_value=0.05,
-                                            value=0.025, step=0.001, format="%.3f")
-        tasa_utilizacion = st.number_input("Tasa Utilización:", min_value=0.3, max_value=0.8, value=0.55, step=0.01,
+                                            value=consumo_porcentaje, step=0.001, format="%.3f")
+        tasa_utilizacion = st.number_input("Tasa Utilización:", min_value=0.3, max_value=0.8, value=tasa_utilizacion, step=0.01,
                                           format="%.2f")
-        umbral_ndvi_suelo = st.number_input("Umbral NDVI Suelo:", min_value=0.05, max_value=0.3, value=0.15, step=0.01,
-                                            format="%.2f")
-        umbral_ndvi_pastura = st.number_input("Umbral NDVI Pastura:", min_value=0.3, max_value=0.8, value=0.6, step=0.01,
-                                              format="%.2f")
 
     st.subheader("📊 Parámetros Ganaderos")
     peso_promedio = st.slider("Peso promedio animal (kg):", 300, 600, 450)
@@ -882,21 +902,29 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("### 🚀 Ejecutar análisis")
 if st.session_state.gdf_cargado is not None:
-    if st.button("🚀 Ejecutar Análisis Forrajero (Realista)"):
-        with st.spinner("Ejecutando análisis..."):
+    if st.button("🚀 Ejecutar Análisis Forrajero (Realista)", type="primary"):
+        with st.spinner("Ejecutando análisis forrajero completo..."):
             try:
                 gdf_input = st.session_state.gdf_cargado.copy()
+                
+                # 1. Dividir potrero en sub-lotes
+                st.info("📐 Dividiendo potrero en sub-lotes...")
                 gdf_sub = dividir_potrero_en_subLotes(gdf_input, n_divisiones)
                 if gdf_sub is None or len(gdf_sub)==0:
                     st.error("No se pudo dividir el potrero en sub-lotes.")
                 else:
+                    # 2. Calcular áreas
                     areas = calcular_superficie(gdf_sub)
                     gdf_sub['area_ha'] = areas.values
+                    
+                    # 3. Calcular índices de vegetación
+                    st.info("🌿 Calculando índices de vegetación...")
                     indices = calcular_indices_forrajeros_realista(gdf_sub, tipo_pastura, fuente_satelital, fecha_imagen, nubes_max,
                                                                   umbral_ndvi_minimo, umbral_ndvi_optimo, sensibilidad_suelo)
                     if not indices:
                         st.error("No se pudieron calcular índices (indices vacío).")
                     else:
+                        # 4. Agregar índices al GeoDataFrame
                         for idx, rec in enumerate(indices):
                             for k,v in rec.items():
                                 if k != 'id_subLote':
@@ -904,6 +932,9 @@ if st.session_state.gdf_cargado is not None:
                                         gdf_sub.loc[gdf_sub.index[idx], k] = v
                                     except Exception:
                                         pass
+                        
+                        # 5. Calcular métricas ganaderas
+                        st.info("🐄 Calculando métricas ganaderas...")
                         metricas = calcular_metricas_ganaderas(gdf_sub, tipo_pastura, peso_promedio, carga_animal)
                         for idx, met in enumerate(metricas):
                             for k,v in met.items():
@@ -911,13 +942,15 @@ if st.session_state.gdf_cargado is not None:
                                     gdf_sub.loc[gdf_sub.index[idx], k] = v
                                 except Exception:
                                     pass
+                        
                         st.session_state.gdf_analizado = gdf_sub
                         
-                        # Crear y mostrar mapas
+                        # 6. Crear y mostrar mapas
                         st.markdown("---")
                         st.markdown("### 🗺️ Mapas de Análisis")
                         
                         # Mapa detallado (Matplotlib)
+                        st.info("🗺️ Generando mapas detallados...")
                         mapa_buf = crear_mapa_detallado_vegetacion(gdf_sub, tipo_pastura)
                         if mapa_buf is not None:
                             st.image(mapa_buf, use_column_width=True, caption="Mapas de Análisis: Tipos de Superficie, Biomasa Disponible, EV/ha y Días de Permanencia")
@@ -950,7 +983,7 @@ if st.session_state.gdf_cargado is not None:
                                 if mapa_ev:
                                     st_folium(mapa_ev, width=400, height=300)
                         
-                        # Exportes: GeoJSON y CSV
+                        # 7. Exportar resultados
                         st.markdown("---")
                         st.markdown("### 📤 Exportar Resultados")
                         col_export1, col_export2 = st.columns(2)
@@ -971,7 +1004,9 @@ if st.session_state.gdf_cargado is not None:
                             except Exception as e:
                                 st.error(f"Error exportando CSV: {e}")
                         
-                        # Mostrar tabla
+                        # 8. Mostrar tabla de resultados
+                        st.markdown("---")
+                        st.markdown("### 📊 Tabla de Resultados")
                         try:
                             columnas_detalle = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 'cobertura_vegetal',
                                                'biomasa_disponible_kg_ms_ha', 'ev_ha', 'dias_permanencia']
@@ -982,8 +1017,9 @@ if st.session_state.gdf_cargado is not None:
                         except Exception:
                             st.info("No hay datos tabulares para mostrar.")
                         
-                        # Generar informe DOCX automáticamente
+                        # 9. Generar informe DOCX automáticamente
                         if DOCX_AVAILABLE:
+                            st.info("📝 Generando informe DOCX...")
                             docx_buf = generar_informe_forrajero_docx(gdf_sub, tipo_pastura, peso_promedio, carga_animal, fecha_imagen)
                             if docx_buf is not None:
                                 st.session_state.docx_buffer = docx_buf
@@ -1007,7 +1043,10 @@ if st.session_state.gdf_cargado is not None:
                                 st.error("❌ No se pudo generar el informe DOCX.")
                         else:
                             st.warning("python-docx no está instalado — no puedo generar DOCX. Ejecutá: pip install python-docx")
+                        
                         st.session_state.analisis_completado = True
+                        st.success("🎉 ¡Análisis completado exitosamente!")
+                        
             except Exception as e:
                 st.error(f"❌ Error ejecutando análisis: {e}")
                 import traceback
