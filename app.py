@@ -96,7 +96,7 @@ def login_section():
         """)
 
 # =============================================================================
-# CONFIGURACIÓN SENTINEL HUB
+# CONFIGURACIÓN SENTINEL HUB - VERSIÓN MEJORADA
 # =============================================================================
 
 class SentinelHubConfig:
@@ -107,16 +107,16 @@ class SentinelHubConfig:
         
     def check_configuration(self):
         try:
-            # Verificar credenciales en secrets
+            # 1. PRIMERO: Verificar Secrets de Streamlit Cloud
             if all(key in st.secrets for key in ['SENTINEL_HUB_CLIENT_ID', 'SENTINEL_HUB_CLIENT_SECRET']):
                 st.session_state.sh_client_id = st.secrets['SENTINEL_HUB_CLIENT_ID']
                 st.session_state.sh_client_secret = st.secrets['SENTINEL_HUB_CLIENT_SECRET']
                 st.session_state.sh_configured = True
                 self.available = True
-                self.config_message = "✅ Sentinel Hub configurado (Secrets)"
+                self.config_message = "✅ Sentinel Hub configurado (Streamlit Secrets)"
                 return True
             
-            # Verificar variables de entorno
+            # 2. SEGUNDO: Verificar variables de entorno
             elif all(os.getenv(key) for key in ['SENTINEL_HUB_CLIENT_ID', 'SENTINEL_HUB_CLIENT_SECRET']):
                 st.session_state.sh_client_id = os.getenv('SENTINEL_HUB_CLIENT_ID')
                 st.session_state.sh_client_secret = os.getenv('SENTINEL_HUB_CLIENT_SECRET')
@@ -125,9 +125,21 @@ class SentinelHubConfig:
                 self.config_message = "✅ Sentinel Hub configurado (Variables Entorno)"
                 return True
             
+            # 3. TERCERO: Verificar session state (configuración manual previa)
+            elif ('sh_client_id' in st.session_state and 
+                  'sh_client_secret' in st.session_state and
+                  st.session_state.sh_client_id and 
+                  st.session_state.sh_client_secret):
+                
+                st.session_state.sh_configured = True
+                self.available = True
+                self.config_message = "✅ Sentinel Hub configurado (Manual)"
+                return True
+            
+            # 4. FALLBACK: Modo simulado para desarrollo
             else:
                 self.available = False
-                self.config_message = "❌ Sentinel Hub no configurado"
+                self.config_message = "❌ Sentinel Hub no configurado - Usando modo simulado"
                 return False
                 
         except Exception as e:
@@ -135,6 +147,15 @@ class SentinelHubConfig:
             self.config_message = f"❌ Error: {str(e)}"
             return False
 
+    def get_credentials_status(self):
+        """Devuelve el estado de las credenciales para mostrar en la UI"""
+        if self.available:
+            client_id = st.session_state.get('sh_client_id', '')
+            # Mostrar solo los primeros y últimos caracteres por seguridad
+            masked_id = f"{client_id[:8]}...{client_id[-4:]}" if client_id else "No disponible"
+            return f"🟢 Conectado (ID: {masked_id})"
+        else:
+            return "🔴 No configurado - Modo simulado"
 # =============================================================================
 # PARÁMETROS FORRAJEROS UNIFICADOS
 # =============================================================================
