@@ -64,6 +64,9 @@ def initialize_session_state():
         st.session_state.sh_client_secret = None
     if 'sh_configured' not in st.session_state:
         st.session_state.sh_configured = False
+    # Nuevos estados para parámetros personalizados
+    if 'parametros_personalizados' not in st.session_state:
+        st.session_state.parametros_personalizados = {}
 
 # Sistema de autenticación simple
 def check_authentication():
@@ -221,7 +224,7 @@ class SentinelHubProcessor:
             return 0.5  # Valor por defecto
 
 # =============================================================================
-# PARÁMETROS FORRAJEROS UNIFICADOS - MEJORADOS
+# PARÁMETROS FORRAJEROS UNIFICADOS - MEJORADOS CON PERSONALIZACIÓN
 # =============================================================================
 
 PARAMETROS_FORRAJEROS = {
@@ -235,6 +238,7 @@ PARAMETROS_FORRAJEROS = {
         'UMBRAL_NDVI_PASTURA': 0.45,
         'CONSUMO_DIARIO_EV': 12,
         'EFICIENCIA_PASTOREO': 0.75,
+        'EFICIENCIA_COSECHA': 0.70,
         'DIGESTIBILIDAD': 0.65,
         'PROTEINA_CRUDA': 0.18
     },
@@ -248,6 +252,7 @@ PARAMETROS_FORRAJEROS = {
         'UMBRAL_NDVI_PASTURA': 0.50,
         'CONSUMO_DIARIO_EV': 10,
         'EFICIENCIA_PASTOREO': 0.70,
+        'EFICIENCIA_COSECHA': 0.65,
         'DIGESTIBILIDAD': 0.70,
         'PROTEINA_CRUDA': 0.15
     },
@@ -261,6 +266,7 @@ PARAMETROS_FORRAJEROS = {
         'UMBRAL_NDVI_PASTURA': 0.55,
         'CONSUMO_DIARIO_EV': 9,
         'EFICIENCIA_PASTOREO': 0.65,
+        'EFICIENCIA_COSECHA': 0.60,
         'DIGESTIBILIDAD': 0.60,
         'PROTEINA_CRUDA': 0.12
     },
@@ -274,6 +280,7 @@ PARAMETROS_FORRAJEROS = {
         'UMBRAL_NDVI_PASTURA': 0.52,
         'CONSUMO_DIARIO_EV': 10,
         'EFICIENCIA_PASTOREO': 0.68,
+        'EFICIENCIA_COSECHA': 0.62,
         'DIGESTIBILIDAD': 0.55,
         'PROTEINA_CRUDA': 0.10
     },
@@ -287,10 +294,35 @@ PARAMETROS_FORRAJEROS = {
         'UMBRAL_NDVI_PASTURA': 0.48,
         'CONSUMO_DIARIO_EV': 8,
         'EFICIENCIA_PASTOREO': 0.60,
+        'EFICIENCIA_COSECHA': 0.55,
         'DIGESTIBILIDAD': 0.50,
         'PROTEINA_CRUDA': 0.08
+    },
+    'PERSONALIZADO': {
+        'MS_POR_HA_OPTIMO': 3000,
+        'CRECIMIENTO_DIARIO': 60,
+        'CONSUMO_PORCENTAJE_PESO': 0.025,
+        'TASA_UTILIZACION_RECOMENDADA': 0.55,
+        'FACTOR_BIOMASA_NDVI': 2300,
+        'UMBRAL_NDVI_SUELO': 0.18,
+        'UMBRAL_NDVI_PASTURA': 0.50,
+        'CONSUMO_DIARIO_EV': 10,
+        'EFICIENCIA_PASTOREO': 0.65,
+        'EFICIENCIA_COSECHA': 0.60,
+        'DIGESTIBILIDAD': 0.60,
+        'PROTEINA_CRUDA': 0.12
     }
 }
+
+def obtener_parametros(tipo_pastura, parametros_personalizados=None):
+    """Obtiene parámetros con soporte para personalización"""
+    if tipo_pastura == "PERSONALIZADO" and parametros_personalizados:
+        # Combinar parámetros base con personalizados
+        base = PARAMETROS_FORRAJEROS['PERSONALIZADO'].copy()
+        base.update(parametros_personalizados)
+        return base
+    else:
+        return PARAMETROS_FORRAJEROS.get(tipo_pastura, PARAMETROS_FORRAJEROS['FESTUCA'])
 
 # =============================================================================
 # FUNCIONES DE CÁLCULO UNIFICADAS - MEJORADAS
@@ -316,15 +348,16 @@ def calcular_dias_permanencia(biomasa_total_kg, consumo_total_diario, crecimient
         return min(dias_ajustados, 365)  # Máximo 1 año
     return min(biomasa_total_kg / consumo_total_diario, 365)
 
-def obtener_parametros(tipo_pastura):
-    return PARAMETROS_FORRAJEROS.get(tipo_pastura, PARAMETROS_FORRAJEROS['FESTUCA'])
-
-def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura):
+def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura, parametros_personalizados=None):
     """Calcula la disponibilidad forrajera con métricas mejoradas"""
-    params = obtener_parametros(tipo_pastura)
+    params = obtener_parametros(tipo_pastura, parametros_personalizados)
     
-    # Cálculos mejorados de disponibilidad
-    gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] = gdf_analizado['biomasa_disponible_kg_ms_ha'] * params['EFICIENCIA_PASTOREO']
+    # Cálculos mejorados de disponibilidad considerando eficiencia de cosecha
+    gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] = (
+        gdf_analizado['biomasa_disponible_kg_ms_ha'] * 
+        params['EFICIENCIA_PASTOREO'] * 
+        params['EFICIENCIA_COSECHA']
+    )
     
     # Clasificación de disponibilidad
     condiciones = [
@@ -341,7 +374,7 @@ def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura):
     return gdf_analizado
 
 # =============================================================================
-# FUNCIONES DE MAPAS UNIFICADAS - MEJORADAS
+# FUNCIONES DE MAPAS UNIFICADAS - MEJORADAS CON LEYENDAS
 # =============================================================================
 
 MAPAS_BASE = {
@@ -389,7 +422,7 @@ def crear_mapa_base(gdf, mapa_seleccionado="ESRI World Imagery", zoom_start=10):
     return m
 
 def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de NDVI"""
+    """Crea mapa interactivo de NDVI con leyenda mejorada"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -423,14 +456,32 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda
+    # Leyenda mejorada
     legend_html = '''
-    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999;">
-    <p><strong>🌿 NDVI</strong></p>
-    <p><i style="background: #8B4513; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> < 0.2 (Suelo)</p>
-    <p><i style="background: #FFD700; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 0.2-0.4 (Escasa)</p>
-    <p><i style="background: #32CD32; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 0.4-0.6 (Moderada)</p>
-    <p><i style="background: #006400; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> > 0.6 (Densa)</p>
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 220px; 
+                background-color: white; border:2px solid grey; z-index:9999; 
+                font-size:12px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
+            🌿 Índice NDVI
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #8B4513; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>&lt; 0.2 - Suelo desnudo</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FFD700; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>0.2-0.4 - Vegetación escasa</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #32CD32; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>0.4-0.6 - Vegetación moderada</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <div style="width: 20px; height: 15px; background: #006400; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>&gt; 0.6 - Vegetación densa</span>
+        </div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -438,7 +489,7 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de EV/ha"""
+    """Crea mapa interactivo de EV/ha con leyenda mejorada"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -472,14 +523,32 @@ def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda
+    # Leyenda mejorada
     legend_html = '''
-    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999;">
-    <p><strong>🐄 EV/ha</strong></p>
-    <p><i style="background: #FF6B6B; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> < 0.5 (Muy Baja)</p>
-    <p><i style="background: #FFA726; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 0.5-2.0 (Baja)</p>
-    <p><i style="background: #FFD54F; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 2.0-4.0 (Moderada)</p>
-    <p><i style="background: #66BB6A; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> > 4.0 (Alta)</p>
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 200px; 
+                background-color: white; border:2px solid grey; z-index:9999; 
+                font-size:12px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
+            🐄 Capacidad de Carga
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>&lt; 0.5 EV/ha</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FFA726; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>0.5-2.0 EV/ha</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FFD54F; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>2.0-4.0 EV/ha</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <div style="width: 20px; height: 15px; background: #66BB6A; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>&gt; 4.0 EV/ha</span>
+        </div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -487,7 +556,7 @@ def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de disponibilidad forrajera"""
+    """Crea mapa interactivo de disponibilidad forrajera con leyenda mejorada"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -519,13 +588,28 @@ def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda
+    # Leyenda mejorada
     legend_html = '''
-    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999;">
-    <p><strong>📊 Disponibilidad</strong></p>
-    <p><i style="background: #FF6B6B; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> Baja (< 500 kg MS/ha)</p>
-    <p><i style="background: #FFD54F; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> Media (500-1500 kg MS/ha)</p>
-    <p><i style="background: #66BB6A; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> Alta (> 1500 kg MS/ha)</p>
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 250px; 
+                background-color: white; border:2px solid grey; z-index:9999; 
+                font-size:12px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
+            📊 Disponibilidad Forrajera
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>Baja (&lt; 500 kg MS/ha)</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FFD54F; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>Media (500-1500 kg MS/ha)</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <div style="width: 20px; height: 15px; background: #66BB6A; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>Alta (&gt; 1500 kg MS/ha)</span>
+        </div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -533,7 +617,7 @@ def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo con recomendaciones agroecológicas"""
+    """Crea mapa interactivo con recomendaciones agroecológicas con leyenda mejorada"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -543,13 +627,10 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
         categoria = feature['properties']['categoria_disponibilidad']
         if categoria == 'BAJA':
             color = '#FF6B6B'  # Rojo - intervención urgente
-            icon = '🚨'
         elif categoria == 'MEDIA':
             color = '#FFD54F'  # Amarillo - manejo cuidadoso
-            icon = '⚠️'
         else:
             color = '#66BB6A'  # Verde - mantenimiento
-            icon = '✅'
             
         return {
             'fillColor': color,
@@ -557,14 +638,6 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
             'weight': 2,
             'fillOpacity': 0.6
         }
-    
-    def get_recomendacion_text(categoria):
-        recomendaciones = {
-            'BAJA': '🔴 INTERVENCIÓN URGENTE: Recuperación activa necesaria',
-            'MEDIA': '🟡 MANEJO CUIDADOSO: Mejora progresiva recomendada', 
-            'ALTA': '🟢 MANTENIMIENTO: Prácticas conservativas'
-        }
-        return recomendaciones.get(categoria, '')
     
     # Agregar polígonos con recomendaciones
     folium.GeoJson(
@@ -582,13 +655,28 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
         )
     ).add_to(m)
     
-    # Leyenda de recomendaciones
+    # Leyenda de recomendaciones mejorada
     legend_html = '''
-    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999; width: 300px;">
-    <p><strong>🌱 Recomendaciones Agroecológicas</strong></p>
-    <p><i style="background: #FF6B6B; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 🔴 INTERVENCIÓN URGENTE</p>
-    <p><i style="background: #FFD54F; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 🟡 MANEJO CUIDADOSO</p>
-    <p><i style="background: #66BB6A; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 🟢 MANTENIMIENTO</p>
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 280px; 
+                background-color: white; border:2px solid grey; z-index:9999; 
+                font-size:12px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
+            🌱 Recomendaciones Agroecológicas
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>🔴 Intervención Urgente</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div style="width: 20px; height: 15px; background: #FFD54F; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>🟡 Manejo Cuidadoso</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <div style="width: 20px; height: 15px; background: #66BB6A; border: 1px solid #000; margin-right: 8px;"></div>
+            <span>🟢 Mantenimiento</span>
+        </div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -626,7 +714,8 @@ class AnalizadorForrajeroUnificado:
             gdf_analizado = self._calcular_metricas_ganaderas(gdf_dividido, resultados, config)
             
             # Calcular disponibilidad forrajera
-            gdf_analizado = calcular_disponibilidad_forrajera(gdf_analizado, config['tipo_pastura'])
+            parametros_personalizados = config.get('parametros_personalizados')
+            gdf_analizado = calcular_disponibilidad_forrajera(gdf_analizado, config['tipo_pastura'], parametros_personalizados)
             
             return gdf_analizado
             
@@ -693,6 +782,7 @@ class AnalizadorForrajeroUnificado:
         """Obtiene datos de vegetación (simulado o real)"""
         resultados = []
         processor = SentinelHubProcessor()
+        parametros_personalizados = config.get('parametros_personalizados')
         
         for idx, row in gdf.iterrows():
             # Obtener NDVI (real o simulado)
@@ -703,7 +793,7 @@ class AnalizadorForrajeroUnificado:
             ndvi = processor.get_ndvi_for_geometry(row.geometry, fecha_imagen, bbox)
             
             # Calcular biomasa basada en NDVI
-            params = obtener_parametros(config['tipo_pastura'])
+            params = obtener_parametros(config['tipo_pastura'], parametros_personalizados)
             biomasa_total = params['FACTOR_BIOMASA_NDVI'] * ndvi
             biomasa_disponible = biomasa_total * params['TASA_UTILIZACION_RECOMENDADA']
             
@@ -728,16 +818,20 @@ class AnalizadorForrajeroUnificado:
     
     def _calcular_metricas_ganaderas(self, gdf, resultados, config):
         """Calcula todas las métricas ganaderas"""
-        params = obtener_parametros(config['tipo_pastura'])
+        parametros_personalizados = config.get('parametros_personalizados')
+        params = obtener_parametros(config['tipo_pastura'], parametros_personalizados)
+        
+        # Usar consumo personalizado si está disponible
+        consumo_diario_personalizado = config.get('consumo_voluntario', params['CONSUMO_DIARIO_EV'])
+        eficiencia_pastoreo_personalizada = config.get('eficiencia_pastoreo', params['EFICIENCIA_PASTOREO'])
+        eficiencia_cosecha_personalizada = config.get('eficiencia_cosecha', params['EFICIENCIA_COSECHA'])
         
         for idx, resultado in enumerate(resultados):
             area_ha = gdf.loc[gdf.index[idx], 'area_ha']
             biomasa_disponible = resultado['biomasa_disponible_kg_ms_ha']
             
-            # EV/ha
-            consumo_diario = config.get('consumo_diario_personalizado', params['CONSUMO_DIARIO_EV'])
-            eficiencia = config.get('eficiencia_pastoreo', params['EFICIENCIA_PASTOREO'])
-            ev_ha = calcular_ev_ha(biomasa_disponible, consumo_diario, eficiencia)
+            # EV/ha con parámetros personalizados
+            ev_ha = calcular_ev_ha(biomasa_disponible, consumo_diario_personalizado, eficiencia_pastoreo_personalizada)
             
             # Carga animal
             carga_animal = calcular_carga_animal_total(ev_ha, area_ha)
@@ -769,6 +863,29 @@ class AnalizadorForrajeroUnificado:
 # =============================================================================
 # GENERACIÓN DE INFORMES - MEJORADA
 # =============================================================================
+
+def crear_mapa_detallado(gdf_analizado, tipo_pastura):
+    """Crea un mapa detallado para el informe"""
+    try:
+        # Crear figura de matplotlib
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        
+        # Plot simple para el informe
+        gdf_analizado.plot(column='ndvi', ax=ax, legend=True, 
+                          cmap='RdYlGn', vmin=0, vmax=1)
+        ax.set_title(f'Mapa de NDVI - {tipo_pastura}')
+        ax.set_axis_off()
+        
+        # Guardar en buffer
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
+        buffer.seek(0)
+        plt.close()
+        
+        return buffer
+    except Exception as e:
+        st.error(f"Error creando mapa para informe: {e}")
+        return None
 
 def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
     """Genera informe DOCX con análisis completo"""
@@ -920,7 +1037,7 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
     return "\n".join(recomendaciones)
 
 # =============================================================================
-# INTERFAZ PRINCIPAL - MEJORADA
+# INTERFAZ PRINCIPAL - MEJORADA CON PARÁMETROS PERSONALIZADOS
 # =============================================================================
 
 def main_application():
@@ -938,7 +1055,7 @@ def main_application():
         st.markdown("---")
         
         # =============================================================================
-        # 🛰️ CONFIGURACIÓN SENTINEL HUB - NUEVA SECCIÓN
+        # 🛰️ CONFIGURACIÓN SENTINEL HUB
         # =============================================================================
         st.header("🛰️ Configuración Sentinel Hub")
         
@@ -988,21 +1105,92 @@ def main_application():
                 st.rerun()
         
         st.markdown("---")
-        # =============================================================================
-        # FIN DE LA SECCIÓN SENTINEL HUB
-        # =============================================================================
         
-        # 🌿 EL RESTO DE TU CONFIGURACIÓN ACTUAL
+        # =============================================================================
+        # 🌿 PARÁMETROS FORRAJEROS - MEJORADO CON PERSONALIZACIÓN
+        # =============================================================================
         st.header("🌿 Parámetros Forrajeros")
         tipo_pastura = st.selectbox(
             "Tipo de Pastura:",
-            ["ALFALFA", "RAYGRASS", "FESTUCA", "AGROPIRRO", "PASTIZAL_NATURAL"]
+            ["ALFALFA", "RAYGRASS", "FESTUCA", "AGROPIRRO", "PASTIZAL_NATURAL", "PERSONALIZADO"]
         )
         
+        # Parámetros personalizados si se selecciona "PERSONALIZADO"
+        parametros_personalizados = {}
+        if tipo_pastura == "PERSONALIZADO":
+            with st.expander("🔧 Parámetros Personalizados", expanded=True):
+                st.subheader("📊 Parámetros de Producción")
+                parametros_personalizados['MS_POR_HA_OPTIMO'] = st.number_input(
+                    "Biomasa Óptima (kg MS/ha):",
+                    min_value=1000, max_value=10000, value=3000, step=100,
+                    help="Materia seca óptima por hectárea"
+                )
+                parametros_personalizados['CRECIMIENTO_DIARIO'] = st.number_input(
+                    "Crecimiento Diario (kg MS/ha/día):",
+                    min_value=10, max_value=300, value=60, step=5,
+                    help="Crecimiento diario de materia seca"
+                )
+                parametros_personalizados['FACTOR_BIOMASA_NDVI'] = st.number_input(
+                    "Factor Biomasa-NDVI:",
+                    min_value=1000, max_value=5000, value=2300, step=100,
+                    help="Factor de conversión de NDVI a biomasa"
+                )
+                
+                st.subheader("🌿 Parámetros de Calidad")
+                parametros_personalizados['DIGESTIBILIDAD'] = st.slider(
+                    "Digestibilidad (%):",
+                    min_value=0.3, max_value=0.8, value=0.6, step=0.05,
+                    help="Porcentaje de digestibilidad del forraje"
+                )
+                parametros_personalizados['PROTEINA_CRUDA'] = st.slider(
+                    "Proteína Cruda (%):",
+                    min_value=0.05, max_value=0.25, value=0.12, step=0.01,
+                    help="Contenido de proteína cruda"
+                )
+                
+                st.subheader("📏 Umbrales de Detección")
+                parametros_personalizados['UMBRAL_NDVI_SUELO'] = st.slider(
+                    "Umbral NDVI Suelo:",
+                    min_value=0.05, max_value=0.3, value=0.18, step=0.01,
+                    help="NDVI por debajo de este valor se considera suelo desnudo"
+                )
+                parametros_personalizados['UMBRAL_NDVI_PASTURA'] = st.slider(
+                    "Umbral NDVI Pastura:",
+                    min_value=0.3, max_value=0.8, value=0.50, step=0.01,
+                    help="NDVI por encima de este valor se considera vegetación densa"
+                )
+        
+        # =============================================================================
+        # 🐄 PARÁMETROS GANADEROS - MEJORADO CON CONSUMO VOLUNTARIO
+        # =============================================================================
         st.header("🐄 Parámetros Ganaderos")
         peso_promedio = st.slider("Peso promedio (kg):", 300, 600, 450)
         carga_animal = st.slider("Carga animal:", 1, 1000, 100)
         
+        with st.expander("🍽️ Parámetros de Consumo", expanded=False):
+            st.subheader("Consumo Animal")
+            consumo_voluntario = st.number_input(
+                "Consumo Voluntario (kg MS/día/animal):",
+                min_value=8.0, max_value=15.0, value=10.0, step=0.5,
+                help="Consumo diario de materia seca por animal"
+            )
+            
+            st.subheader("Eficiencias")
+            eficiencia_pastoreo = st.slider(
+                "Eficiencia de Pastoreo (%):",
+                min_value=50, max_value=90, value=65, step=5,
+                help="Porcentaje de forraje que realmente consume el animal"
+            ) / 100.0
+            
+            eficiencia_cosecha = st.slider(
+                "Eficiencia de Cosecha (%):",
+                min_value=50, max_value=90, value=60, step=5,
+                help="Porcentaje de biomasa que se puede cosechar eficientemente"
+            ) / 100.0
+        
+        # =============================================================================
+        # 📅 CONFIGURACIÓN TEMPORAL Y ESPACIAL
+        # =============================================================================
         st.header("📅 Configuración Temporal")
         fecha_imagen = st.date_input(
             "Fecha de imagen:",
@@ -1077,7 +1265,11 @@ def main_application():
                 'peso_promedio': peso_promedio,
                 'carga_animal': carga_animal,
                 'n_divisiones': n_divisiones,
-                'fecha_imagen': fecha_imagen
+                'fecha_imagen': fecha_imagen,
+                'parametros_personalizados': parametros_personalizados if tipo_pastura == "PERSONALIZADO" else None,
+                'consumo_voluntario': consumo_voluntario,
+                'eficiencia_pastoreo': eficiencia_pastoreo,
+                'eficiencia_cosecha': eficiencia_cosecha
             }
             
             with st.spinner("Realizando análisis completo..."):
@@ -1089,20 +1281,6 @@ def main_application():
                     
                     # Mostrar resultados
                     mostrar_resultados_completos(gdf_analizado, config)
-                    
-                    # Generar y descargar informe
-                    if DOCX_AVAILABLE:
-                        with st.spinner("Generando informe..."):
-                            # Crear mapa detallado para el informe
-                            mapa_buffer = crear_mapa_detallado(gdf_analizado, config['tipo_pastura'])
-                            informe_buffer = generar_informe_completo(gdf_analizado, config, mapa_buffer)
-                            if informe_buffer:
-                                st.download_button(
-                                    "📄 Descargar Informe DOCX",
-                                    informe_buffer,
-                                    f"informe_forrajero_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
-                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                )
     
     else:
         # Pantalla de bienvenida
@@ -1245,7 +1423,7 @@ def mostrar_resultados_completos(gdf_analizado, config):
     else:
         st.warning("⚠️ Folium no está disponible. Los mapas interactivos no se mostrarán.")
     
-    # Exportar datos
+    # Exportar datos - CORREGIDO (sin duplicación de botones)
     st.header("💾 EXPORTAR RESULTADOS")
     col_exp1, col_exp2, col_exp3 = st.columns(3)
     
@@ -1260,8 +1438,9 @@ def mostrar_resultados_completos(gdf_analizado, config):
         st.download_button(
             "📥 Descargar CSV Completo",
             csv,
-            f"resultados_completos_{config['tipo_pastura']}.csv",
-            "text/csv"
+            f"resultados_completos_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            "text/csv",
+            key="download_csv_unique"  # Key única
         )
     
     with col_exp2:
@@ -1270,69 +1449,37 @@ def mostrar_resultados_completos(gdf_analizado, config):
         st.download_button(
             "📥 Descargar GeoJSON",
             geojson,
-            f"resultados_{config['tipo_pastura']}.geojson",
-            "application/json"
+            f"resultados_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson",
+            "application/json",
+            key="download_geojson_unique"  # Key única
         )
     
     with col_exp3:
-        # Resumen ejecutivo
+        # Informe DOCX
         if DOCX_AVAILABLE:
-            with st.spinner("Preparando resumen..."):
+            with st.spinner("Preparando informe..."):
                 mapa_buffer = crear_mapa_detallado(gdf_analizado, config['tipo_pastura'])
                 informe_buffer = generar_informe_completo(gdf_analizado, config, mapa_buffer)
+                
                 if informe_buffer:
                     st.download_button(
                         "📄 Descargar Informe DOCX",
-                        informe_buffer,
-                        f"informe_forrajero_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        data=informe_buffer.getvalue(),
+                        file_name=f"informe_forrajero_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key="download_docx_unique"  # Key única
                     )
-
-# Funciones auxiliares para mapas
-def crear_mapa_detallado(gdf_analizado, tipo_pastura):
-    """Crea un mapa detallado para el informe"""
-    try:
-        fig, ax = plt.subplots(figsize=(12, 8))
-        
-        # Colores por tipo de superficie
-        colores_superficie = {
-            'SUELO_DESNUDO': '#d73027',
-            'VEGETACION_ESCASA': '#fee08b',
-            'VEGETACION_DENSA': '#1a9850'
-        }
-        
-        for idx, row in gdf_analizado.iterrows():
-            tipo = row.get('tipo_superficie', 'VEGETACION_ESCASA')
-            color = colores_superficie.get(tipo, '#cccccc')
-            gdf_analizado.iloc[[idx]].plot(ax=ax, color=color, edgecolor='black', linewidth=0.5)
-        
-        ax.set_title(f'Mapa de Análisis - {tipo_pastura}', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Longitud')
-        ax.set_ylabel('Latitud')
-        
-        # Leyenda
-        leyenda_elementos = []
-        for tipo, color in colores_superficie.items():
-            leyenda_elementos.append(mpatches.Patch(color=color, label=tipo))
-        ax.legend(handles=leyenda_elementos, loc='upper right')
-        
-        plt.tight_layout()
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-        buf.seek(0)
-        plt.close()
-        return buf
-        
-    except Exception as e:
-        st.error(f"Error creando mapa detallado: {e}")
-        return None
+                else:
+                    st.error("Error generando informe DOCX")
+        else:
+            st.warning("python-docx no disponible para generar informes")
 
 # =============================================================================
-# EJECUCIÓN PRINCIPAL
+# FUNCIÓN PRINCIPAL
 # =============================================================================
 
 def main():
-    # INICIALIZAR SESSION STATE PRIMERO
+    """Función principal de la aplicación"""
     initialize_session_state()
     
     if not st.session_state.authenticated:
