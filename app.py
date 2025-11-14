@@ -472,7 +472,8 @@ def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fe
 # -----------------------
 def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
     try:
-        fig, (ax1, ax2, ax3, ax4) = plt.subplots(2, 2, figsize=(20, 16))
+        fig, axes = plt.subplots(2, 2, figsize=(20, 16))
+        ax1, ax2, ax3, ax4 = axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]
         
         # Mapa 1: Tipos de Superficie
         colores_superficie = {
@@ -542,23 +543,32 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
         return None
     bounds = gdf.total_bounds
     centroid = gdf.geometry.centroid.iloc[0]
-    m = folium.Map(location=[centroid.y, centroid.x], tiles=None, control_scale=True)
+    m = folium.Map(location=[centroid.y, centroid.x], tiles=None, control_scale=True, zoom_start=12)
     
-    # Definir mapas base
+    # Definir mapas base CORREGIDOS
     if base_map_name == "ESRI Satélite":
-        tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y/{x}'
-        attr = 'Esri'
+        tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        attr = 'Esri, Maxar, Earthstar Geographics'
+        folium.TileLayer(tiles=tiles, attr=attr, name='ESRI Satellite').add_to(m)
     elif base_map_name == "OpenStreetMap":
-        tiles = 'OpenStreetMap'
-        attr = 'OpenStreetMap'
+        folium.TileLayer(tiles='OpenStreetMap', name='OpenStreetMap').add_to(m)
     else:  # CartoDB Positron
-        tiles = 'CartoDB positron'
-        attr = 'CartoDB'
+        folium.TileLayer(tiles='CartoDB positron', name='CartoDB Positron').add_to(m)
     
-    folium.TileLayer(tiles, attr=attr, name=base_map_name).add_to(m)
-    folium.GeoJson(gdf.__geo_interface__, name='Polígono', 
-                   style_function=lambda feat: {'color':'blue','weight':2,'fillOpacity':0.2}).add_to(m)
-    m.fit_bounds([[bounds[1], bounds[0]],[bounds[3], bounds[2]]])
+    # Añadir el polígono
+    folium.GeoJson(
+        gdf.__geo_interface__, 
+        name='Potrero',
+        style_function=lambda feature: {
+            'fillColor': 'blue',
+            'color': 'blue',
+            'weight': 2,
+            'fillOpacity': 0.1
+        },
+        tooltip=folium.GeoJsonTooltip(fields=[], aliases=[], labels=True)
+    ).add_to(m)
+    
+    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
     folium.LayerControl().add_to(m)
     return m
 
