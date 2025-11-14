@@ -868,6 +868,8 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
 # -----------------------
 # FLUJO PRINCIPAL: carga, análisis, exportes
 # -----------------------
+
+# PRIMERO: Mostrar sección de carga de archivo
 st.markdown("### 📁 Cargar / visualizar lote")
 gdf_loaded = None
 if uploaded_file is not None:
@@ -899,10 +901,17 @@ if uploaded_file is not None:
         except Exception as e:
             st.error(f"❌ Error al cargar archivo: {e}")
 
-st.markdown("---")
-st.markdown("### 🚀 Ejecutar análisis")
+# SEGUNDO: Mostrar sección de análisis SOLO si hay archivo cargado
 if st.session_state.gdf_cargado is not None:
-    if st.button("🚀 Ejecutar Análisis Forrajero (Realista)", type="primary"):
+    st.markdown("---")
+    st.markdown("### 🚀 Ejecutar análisis")
+    
+    # Botón de análisis PRINCIPAL - debe estar fuera de cualquier condición
+    if st.button("🚀 Ejecutar Análisis Forrajero (Realista)", type="primary", key="analisis_principal"):
+        st.session_state.analisis_ejecutado = True
+    
+    # Ejecutar análisis solo cuando se presiona el botón
+    if st.session_state.get('analisis_ejecutado', False):
         with st.spinner("Ejecutando análisis forrajero completo..."):
             try:
                 gdf_input = st.session_state.gdf_cargado.copy()
