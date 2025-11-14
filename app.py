@@ -21,6 +21,7 @@ import math
 import base64
 import hashlib
 import streamlit.components.v1 as components
+import json
 
 # Intento importar python-docx
 try:
@@ -608,7 +609,7 @@ def crear_mapa_interactivo_con_esri(gdf, base_map_name="ESRI Satélite"):
     return m
 
 def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
-    """Crea mapas de análisis superpuestos sobre ESRI Satélite"""
+    """Crea mapas de análisis superpuestos sobre ESRI Satélite - CORREGIDO"""
     if not FOLIUM_AVAILABLE:
         return None
     
@@ -623,14 +624,42 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
         'VEGETACION_DENSA': '#1a9850'
     }
     
+    # Crear una copia del GeoDataFrame con las propiedades necesarias
+    gdf_copy = gdf_analizado.copy()
+    
+    # Asegurarse de que todas las columnas necesarias existen
+    columnas_necesarias = ['id_subLote', 'tipo_superficie', 'ndvi', 'biomasa_disponible_kg_ms_ha', 'ev_ha', 'dias_permanencia']
+    for col in columnas_necesarias:
+        if col not in gdf_copy.columns:
+            gdf_copy[col] = 0
+    
     # Mapa 1: Tipos de Superficie
     m1 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    for idx, row in gdf_analizado.iterrows():
+    
+    # Crear un FeatureGroup para los sub-lotes
+    feature_group_tipos = folium.FeatureGroup(name='Tipos de Superficie')
+    
+    for idx, row in gdf_copy.iterrows():
         tipo = row.get('tipo_superficie', 'VEGETACION_ESCASA')
         color = colores_superficie.get(tipo, '#cccccc')
         
+        # Crear propiedades para el tooltip
+        propiedades = {
+            'id_subLote': int(row.get('id_subLote', 0)),
+            'tipo_superficie': str(tipo),
+            'ndvi': float(row.get('ndvi', 0)),
+            'biomasa_disponible_kg_ms_ha': float(row.get('biomasa_disponible_kg_ms_ha', 0))
+        }
+        
+        # Crear feature con propiedades
+        feature = {
+            'type': 'Feature',
+            'geometry': row.geometry.__geo_interface__,
+            'properties': propiedades
+        }
+        
         folium.GeoJson(
-            row.geometry.__geo_interface__,
+            feature,
             style_function=lambda feature, color=color: {
                 'fillColor': color,
                 'color': 'black',
@@ -639,16 +668,19 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
             },
             tooltip=folium.GeoJsonTooltip(
                 fields=['id_subLote', 'tipo_superficie', 'ndvi', 'biomasa_disponible_kg_ms_ha'],
-                aliases=['Sub-lote:', 'Tipo:', 'NDVI:', 'Biomasa:'],
+                aliases=['Sub-lote:', 'Tipo:', 'NDVI:', 'Biomasa (kg MS/ha):'],
                 localize=True
             )
-        ).add_to(m1)
+        ).add_to(feature_group_tipos)
     
+    feature_group_tipos.add_to(m1)
     mapas['tipos_superficie'] = m1
     
     # Mapa 2: Biomasa Disponible
     m2 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    for idx, row in gdf_analizado.iterrows():
+    feature_group_biomasa = folium.FeatureGroup(name='Biomasa Disponible')
+    
+    for idx, row in gdf_copy.iterrows():
         biom = row.get('biomasa_disponible_kg_ms_ha', 0)
         # Escala de colores para biomasa
         if biom < 600:
@@ -659,9 +691,21 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
             color = '#a6d96a'
         else:
             color = '#1a9850'
+        
+        propiedades = {
+            'id_subLote': int(row.get('id_subLote', 0)),
+            'biomasa_disponible_kg_ms_ha': float(biom),
+            'tipo_superficie': str(row.get('tipo_superficie', ''))
+        }
+        
+        feature = {
+            'type': 'Feature',
+            'geometry': row.geometry.__geo_interface__,
+            'properties': propiedades
+        }
             
         folium.GeoJson(
-            row.geometry.__geo_interface__,
+            feature,
             style_function=lambda feature, color=color: {
                 'fillColor': color,
                 'color': 'black',
@@ -673,13 +717,16 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
                 aliases=['Sub-lote:', 'Biomasa (kg MS/ha):', 'Tipo:'],
                 localize=True
             )
-        ).add_to(m2)
+        ).add_to(feature_group_biomasa)
     
+    feature_group_biomasa.add_to(m2)
     mapas['biomasa'] = m2
     
     # Mapa 3: EV por Hectárea
     m3 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    for idx, row in gdf_analizado.iterrows():
+    feature_group_ev = folium.FeatureGroup(name='EV por Hectárea')
+    
+    for idx, row in gdf_copy.iterrows():
         ev_ha = row.get('ev_ha', 0)
         # Escala de colores para EV/ha
         if ev_ha < 0.5:
@@ -690,9 +737,21 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
             color = '#a6d96a'
         else:
             color = '#1a9850'
+        
+        propiedades = {
+            'id_subLote': int(row.get('id_subLote', 0)),
+            'ev_ha': float(ev_ha),
+            'biomasa_disponible_kg_ms_ha': float(row.get('biomasa_disponible_kg_ms_ha', 0))
+        }
+        
+        feature = {
+            'type': 'Feature',
+            'geometry': row.geometry.__geo_interface__,
+            'properties': propiedades
+        }
             
         folium.GeoJson(
-            row.geometry.__geo_interface__,
+            feature,
             style_function=lambda feature, color=color: {
                 'fillColor': color,
                 'color': 'black',
@@ -701,16 +760,19 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
             },
             tooltip=folium.GeoJsonTooltip(
                 fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha'],
-                aliases=['Sub-lote:', 'EV/ha:', 'Biomasa:'],
+                aliases=['Sub-lote:', 'EV/ha:', 'Biomasa (kg MS/ha):'],
                 localize=True
             )
-        ).add_to(m3)
+        ).add_to(feature_group_ev)
     
+    feature_group_ev.add_to(m3)
     mapas['ev_ha'] = m3
     
     # Mapa 4: Días de Permanencia
     m4 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    for idx, row in gdf_analizado.iterrows():
+    feature_group_dias = folium.FeatureGroup(name='Días de Permanencia')
+    
+    for idx, row in gdf_copy.iterrows():
         dias = row.get('dias_permanencia', 0)
         # Escala de colores para días
         if dias < 15:
@@ -721,9 +783,21 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
             color = '#a6d96a'
         else:
             color = '#1a9850'
+        
+        propiedades = {
+            'id_subLote': int(row.get('id_subLote', 0)),
+            'dias_permanencia': float(dias),
+            'ev_ha': float(row.get('ev_ha', 0))
+        }
+        
+        feature = {
+            'type': 'Feature',
+            'geometry': row.geometry.__geo_interface__,
+            'properties': propiedades
+        }
             
         folium.GeoJson(
-            row.geometry.__geo_interface__,
+            feature,
             style_function=lambda feature, color=color: {
                 'fillColor': color,
                 'color': 'black',
@@ -735,8 +809,9 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
                 aliases=['Sub-lote:', 'Días permanencia:', 'EV/ha:'],
                 localize=True
             )
-        ).add_to(m4)
+        ).add_to(feature_group_dias)
     
+    feature_group_dias.add_to(m4)
     mapas['dias_permanencia'] = m4
     
     return mapas
