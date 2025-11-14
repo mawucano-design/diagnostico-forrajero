@@ -221,7 +221,7 @@ class SentinelHubProcessor:
             return 0.5  # Valor por defecto
 
 # =============================================================================
-# PARÁMETROS FORRAJEROS UNIFICADOS
+# PARÁMETROS FORRAJEROS UNIFICADOS - MEJORADOS
 # =============================================================================
 
 PARAMETROS_FORRAJEROS = {
@@ -293,7 +293,7 @@ PARAMETROS_FORRAJEROS = {
 }
 
 # =============================================================================
-# FUNCIONES DE CÁLCULO UNIFICADAS
+# FUNCIONES DE CÁLCULO UNIFICADAS - MEJORADAS
 # =============================================================================
 
 def calcular_ev_ha(biomasa_disponible_kg_ms_ha, consumo_diario_ev, eficiencia_pastoreo=0.7):
@@ -319,8 +319,29 @@ def calcular_dias_permanencia(biomasa_total_kg, consumo_total_diario, crecimient
 def obtener_parametros(tipo_pastura):
     return PARAMETROS_FORRAJEROS.get(tipo_pastura, PARAMETROS_FORRAJEROS['FESTUCA'])
 
+def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura):
+    """Calcula la disponibilidad forrajera con métricas mejoradas"""
+    params = obtener_parametros(tipo_pastura)
+    
+    # Cálculos mejorados de disponibilidad
+    gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] = gdf_analizado['biomasa_disponible_kg_ms_ha'] * params['EFICIENCIA_PASTOREO']
+    
+    # Clasificación de disponibilidad
+    condiciones = [
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 500,
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 1500,
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] >= 1500
+    ]
+    categorias = ['BAJA', 'MEDIA', 'ALTA']
+    gdf_analizado['categoria_disponibilidad'] = np.select(condiciones, categorias, default='MEDIA')
+    
+    # Cálculo de días de autonomía
+    gdf_analizado['dias_autonomia'] = gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] / 30  # Consumo diario estimado
+    
+    return gdf_analizado
+
 # =============================================================================
-# FUNCIONES DE MAPAS UNIFICADAS
+# FUNCIONES DE MAPAS UNIFICADAS - MEJORADAS
 # =============================================================================
 
 MAPAS_BASE = {
@@ -367,8 +388,215 @@ def crear_mapa_base(gdf, mapa_seleccionado="ESRI World Imagery", zoom_start=10):
     
     return m
 
+def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
+    """Crea mapa interactivo de NDVI"""
+    if not FOLIUM_AVAILABLE:
+        return None
+        
+    m = crear_mapa_base(gdf_analizado, mapa_base)
+    
+    def estilo_ndvi(feature):
+        ndvi = feature['properties']['ndvi']
+        if ndvi < 0.2:
+            color = '#8B4513'  # Marrón - suelo
+        elif ndvi < 0.4:
+            color = '#FFD700'  # Amarillo - vegetación escasa
+        elif ndvi < 0.6:
+            color = '#32CD32'  # Verde claro - vegetación moderada
+        else:
+            color = '#006400'  # Verde oscuro - vegetación densa
+            
+        return {
+            'fillColor': color,
+            'color': 'black',
+            'weight': 1,
+            'fillOpacity': 0.7
+        }
+    
+    folium.GeoJson(
+        gdf_analizado.__geo_interface__,
+        style_function=estilo_ndvi,
+        tooltip=folium.GeoJsonTooltip(
+            fields=['id_subLote', 'ndvi', 'tipo_superficie'],
+            aliases=['Sub-Lote:', 'NDVI:', 'Tipo:'],
+            localize=True
+        )
+    ).add_to(m)
+    
+    # Leyenda
+    legend_html = '''
+    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999;">
+    <p><strong>🌿 NDVI</strong></p>
+    <p><i style="background: #8B4513; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> < 0.2 (Suelo)</p>
+    <p><i style="background: #FFD700; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 0.2-0.4 (Escasa)</p>
+    <p><i style="background: #32CD32; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 0.4-0.6 (Moderada)</p>
+    <p><i style="background: #006400; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> > 0.6 (Densa)</p>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(legend_html))
+    
+    return m
+
+def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
+    """Crea mapa interactivo de EV/ha"""
+    if not FOLIUM_AVAILABLE:
+        return None
+        
+    m = crear_mapa_base(gdf_analizado, mapa_base)
+    
+    def estilo_ev_ha(feature):
+        ev_ha = feature['properties']['ev_ha']
+        if ev_ha < 0.5:
+            color = '#FF6B6B'  # Rojo - muy baja
+        elif ev_ha < 2.0:
+            color = '#FFA726'  # Naranja - baja
+        elif ev_ha < 4.0:
+            color = '#FFD54F'  # Amarillo - moderada
+        else:
+            color = '#66BB6A'  # Verde - alta
+            
+        return {
+            'fillColor': color,
+            'color': 'black',
+            'weight': 1,
+            'fillOpacity': 0.7
+        }
+    
+    folium.GeoJson(
+        gdf_analizado.__geo_interface__,
+        style_function=estilo_ev_ha,
+        tooltip=folium.GeoJsonTooltip(
+            fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha'],
+            aliases=['Sub-Lote:', 'EV/ha:', 'Biomasa:'],
+            localize=True
+        )
+    ).add_to(m)
+    
+    # Leyenda
+    legend_html = '''
+    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999;">
+    <p><strong>🐄 EV/ha</strong></p>
+    <p><i style="background: #FF6B6B; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> < 0.5 (Muy Baja)</p>
+    <p><i style="background: #FFA726; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 0.5-2.0 (Baja)</p>
+    <p><i style="background: #FFD54F; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 2.0-4.0 (Moderada)</p>
+    <p><i style="background: #66BB6A; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> > 4.0 (Alta)</p>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(legend_html))
+    
+    return m
+
+def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
+    """Crea mapa interactivo de disponibilidad forrajera"""
+    if not FOLIUM_AVAILABLE:
+        return None
+        
+    m = crear_mapa_base(gdf_analizado, mapa_base)
+    
+    def estilo_disponibilidad(feature):
+        categoria = feature['properties']['categoria_disponibilidad']
+        if categoria == 'BAJA':
+            color = '#FF6B6B'  # Rojo
+        elif categoria == 'MEDIA':
+            color = '#FFD54F'  # Amarillo
+        else:
+            color = '#66BB6A'  # Verde
+            
+        return {
+            'fillColor': color,
+            'color': 'black',
+            'weight': 1,
+            'fillOpacity': 0.7
+        }
+    
+    folium.GeoJson(
+        gdf_analizado.__geo_interface__,
+        style_function=estilo_disponibilidad,
+        tooltip=folium.GeoJsonTooltip(
+            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
+            aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad (kg MS/ha):', 'Días Autonomía:'],
+            localize=True
+        )
+    ).add_to(m)
+    
+    # Leyenda
+    legend_html = '''
+    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999;">
+    <p><strong>📊 Disponibilidad</strong></p>
+    <p><i style="background: #FF6B6B; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> Baja (< 500 kg MS/ha)</p>
+    <p><i style="background: #FFD54F; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> Media (500-1500 kg MS/ha)</p>
+    <p><i style="background: #66BB6A; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> Alta (> 1500 kg MS/ha)</p>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(legend_html))
+    
+    return m
+
+def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
+    """Crea mapa interactivo con recomendaciones agroecológicas"""
+    if not FOLIUM_AVAILABLE:
+        return None
+        
+    m = crear_mapa_base(gdf_analizado, mapa_base)
+    
+    def estilo_recomendaciones(feature):
+        categoria = feature['properties']['categoria_disponibilidad']
+        if categoria == 'BAJA':
+            color = '#FF6B6B'  # Rojo - intervención urgente
+            icon = '🚨'
+        elif categoria == 'MEDIA':
+            color = '#FFD54F'  # Amarillo - manejo cuidadoso
+            icon = '⚠️'
+        else:
+            color = '#66BB6A'  # Verde - mantenimiento
+            icon = '✅'
+            
+        return {
+            'fillColor': color,
+            'color': 'black',
+            'weight': 2,
+            'fillOpacity': 0.6
+        }
+    
+    def get_recomendacion_text(categoria):
+        recomendaciones = {
+            'BAJA': '🔴 INTERVENCIÓN URGENTE: Recuperación activa necesaria',
+            'MEDIA': '🟡 MANEJO CUIDADOSO: Mejora progresiva recomendada', 
+            'ALTA': '🟢 MANTENIMIENTO: Prácticas conservativas'
+        }
+        return recomendaciones.get(categoria, '')
+    
+    # Agregar polígonos con recomendaciones
+    folium.GeoJson(
+        gdf_analizado.__geo_interface__,
+        style_function=estilo_recomendaciones,
+        tooltip=folium.GeoJsonTooltip(
+            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha'],
+            aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad:'],
+            localize=True
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha'],
+            aliases=['Sub-Lote:', 'Estado:', 'Disponibilidad (kg MS/ha):'],
+            localize=True
+        )
+    ).add_to(m)
+    
+    # Leyenda de recomendaciones
+    legend_html = '''
+    <div style="position: fixed; bottom: 50px; left: 50px; background-color: white; padding: 10px; border: 2px solid grey; z-index: 9999; width: 300px;">
+    <p><strong>🌱 Recomendaciones Agroecológicas</strong></p>
+    <p><i style="background: #FF6B6B; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 🔴 INTERVENCIÓN URGENTE</p>
+    <p><i style="background: #FFD54F; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 🟡 MANEJO CUIDADOSO</p>
+    <p><i style="background: #66BB6A; width: 20px; height: 20px; display: inline-block; margin-right: 5px;"></i> 🟢 MANTENIMIENTO</p>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(legend_html))
+    
+    return m
+
 # =============================================================================
-# SISTEMA DE ANÁLISIS UNIFICADO
+# SISTEMA DE ANÁLISIS UNIFICADO - MEJORADO
 # =============================================================================
 
 class AnalizadorForrajeroUnificado:
@@ -396,6 +624,9 @@ class AnalizadorForrajeroUnificado:
             
             # Calcular métricas ganaderas
             gdf_analizado = self._calcular_metricas_ganaderas(gdf_dividido, resultados, config)
+            
+            # Calcular disponibilidad forrajera
+            gdf_analizado = calcular_disponibilidad_forrajera(gdf_analizado, config['tipo_pastura'])
             
             return gdf_analizado
             
@@ -536,7 +767,7 @@ class AnalizadorForrajeroUnificado:
         return gdf
 
 # =============================================================================
-# GENERACIÓN DE INFORMES
+# GENERACIÓN DE INFORMES - MEJORADA
 # =============================================================================
 
 def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
@@ -563,9 +794,11 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
         biomasa_prom = gdf_analizado['biomasa_disponible_kg_ms_ha'].mean()
         ev_total = gdf_analizado['carga_animal'].sum()
         dias_prom = gdf_analizado['dias_permanencia'].mean()
+        disponibilidad_prom = gdf_analizado['disponibilidad_forrajera_kg_ms_ha'].mean()
         
         doc.add_paragraph(f"Área total analizada: {area_total:.2f} ha")
         doc.add_paragraph(f"Biomasa disponible promedio: {biomasa_prom:.0f} kg MS/ha")
+        doc.add_paragraph(f"Disponibilidad forrajera promedio: {disponibilidad_prom:.0f} kg MS/ha")
         doc.add_paragraph(f"Capacidad total de carga: {ev_total:.1f} EV")
         doc.add_paragraph(f"Días de permanencia promedio: {dias_prom:.1f} días")
         
@@ -582,9 +815,9 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
             except Exception as e:
                 doc.add_paragraph(f"Error al insertar mapa: {e}")
         
-        # Recomendaciones
-        doc.add_heading('Recomendaciones', level=1)
-        recomendaciones = _generar_recomendaciones(gdf_analizado, config)
+        # Recomendaciones agroecológicas
+        doc.add_heading('Recomendaciones Agroecológicas', level=1)
+        recomendaciones = _generar_recomendaciones_agroecologicas(gdf_analizado, config)
         for recomendacion in recomendaciones.split('\n'):
             if recomendacion.strip():
                 doc.add_paragraph(recomendacion.strip())
@@ -599,48 +832,95 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
         st.error(f"Error generando informe: {e}")
         return None
 
-def _generar_recomendaciones(gdf, config):
-    """Genera recomendaciones basadas en el análisis"""
+def _generar_recomendaciones_agroecologicas(gdf, config):
+    """Genera recomendaciones agroecológicas basadas en el análisis"""
     biomasa_prom = gdf['biomasa_disponible_kg_ms_ha'].mean()
+    disponibilidad_prom = gdf['disponibilidad_forrajera_kg_ms_ha'].mean()
     dias_prom = gdf['dias_permanencia'].mean()
     
     recomendaciones = []
     
-    if biomasa_prom < 500:
+    if disponibilidad_prom < 500:
         recomendaciones.extend([
-            "⚠️ **ESTADO CRÍTICO** - Biomasa muy baja",
-            "• Reducir carga animal inmediatamente",
-            "• Implementar suplementación estratégica",
-            "• Aumentar períodos de descanso (60-90 días)",
-            "• Considerar resiembra o mejoramiento"
+            "🔴 **ESTADO CRÍTICO - INTERVENCIÓN AGROECOLÓGICA URGENTE**",
+            "",
+            "🌱 **PRÁCTICAS REGENERATIVAS INMEDIATAS:**",
+            "• Implementar descanso prolongado (90-120 días) con exclusión animal",
+            "• Aplicar abonos verdes y cobertura orgánica (mulch)",
+            "• Sembrar especies pioneras y leguminosas fijadoras de nitrógeno",
+            "• Incorporar compost y biofertilizantes para recuperar suelo",
+            "",
+            "🐄 **MANEJO GANADERO:**",
+            "• Reducir carga animal inmediatamente (máximo 0.5 EV/ha)",
+            "• Implementar suplementación estratégica con conservas",
+            "• Rotaciones muy cortas (1-2 días) con largos descansos",
+            "",
+            "💧 **MANEJO HÍDRICO:**",
+            "• Implementar zanjas de infiltración y barreras vivas",
+            "• Proteger cursos de agua con franjas buffer",
+            "• Utilizar coberturas para retener humedad"
         ])
-    elif biomasa_prom < 1500:
+    elif disponibilidad_prom < 1500:
         recomendaciones.extend([
-            "📋 **ESTADO DE MEJORA** - Biomasa moderada",
+            "🟡 **ESTADO DE MEJORA - MANEJO AGROECOLÓGICO ACTIVO**",
+            "",
+            "🌱 **PRÁCTICAS REGENERATIVAS:**",
             "• Mantener rotaciones con 45-60 días de descanso",
-            "• Monitorear crecimiento semanalmente",
-            "• Ajustar carga según disponibilidad forrajera",
-            "• Implementar pastoreo racional Voisin"
+            "• Enriquecer con mezclas de gramíneas y leguminosas",
+            "• Aplicar microorganismos eficientes y biofertilizantes",
+            "• Implementar pastoreo racional Voisin",
+            "",
+            "🐄 **MANEJO GANADERO:**",
+            "• Carga animal moderada (1-2 EV/ha según disponibilidad)",
+            "• Monitoreo semanal de crecimiento y ajuste de carga",
+            "• Pastoreos cortos e intensivos para estimular rebrote",
+            "",
+            "📊 **SEGUIMIENTO:**",
+            "• Medir altura forrajera y cobertura vegetal periódicamente",
+            "• Registrar datos de biomasa y días de descanso",
+            "• Ajustar manejo según observaciones en campo"
         ])
     else:
         recomendaciones.extend([
-            "✅ **ESTADO ÓPTIMO** - Buena biomasa",
-            "• Mantener sistema actual de rotaciones",
-            "• Optimizar carga animal según EV/ha calculado",
-            "• Continuar monitoreo para mantener estado",
-            "• Considerar enriquecimiento con leguminosas"
+            "🟢 **ESTADO ÓPTIMO - MANEJO AGROECOLÓGICO CONSERVATIVO**",
+            "",
+            "🌱 **PRÁCTICAS REGENERATIVAS:**",
+            "• Mantener sistema actual con mejoras incrementales",
+            "• Diversificar con especies nativas y forrajeras perennes",
+            "• Implementar agroforestería y sistemas silvopastoriles",
+            "• Conservar biodiversidad y hábitats naturales",
+            "",
+            "🐄 **MANEJO GANADERO:**",
+            "• Carga animal óptima (2-4 EV/ha según capacidad)",
+            "• Rotaciones con 30-45 días de descanso",
+            "• Aprovechar picos de crecimiento con pastoreos intensivos",
+            "",
+            "🌍 **SUSTENTABILIDAD:**",
+            "• Monitorear salud del suelo y materia orgánica",
+            "• Implementar captura de carbono en pastizales",
+            "• Conservar corredores biológicos y fuentes de agua"
         ])
     
-    # Recomendaciones específicas por días de permanencia
+    # Recomendaciones específicas adicionales
     if dias_prom < 7:
-        recomendaciones.append("• ⚠️ Días de permanencia muy bajos - considerar suplementación")
+        recomendaciones.extend([
+            "",
+            "⚠️ **ALERTA:** Días de permanencia muy bajos",
+            "• Considerar suplementación inmediata",
+            "• Revisar carga animal y distribución"
+        ])
     elif dias_prom > 60:
-        recomendaciones.append("• ✅ Buenos días de permanencia - sistema sostenible")
+        recomendaciones.extend([
+            "",
+            "✅ **EXCELENTE:** Sistema con buena autonomía",
+            "• Mantener prácticas actuales",
+            "• Considerar enriquecimiento con leguminosas"
+        ])
     
     return "\n".join(recomendaciones)
 
 # =============================================================================
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL - MEJORADA
 # =============================================================================
 
 def main_application():
@@ -845,79 +1125,168 @@ def main_application():
         """)
 
 def mostrar_resultados_completos(gdf_analizado, config):
-    """Muestra resultados completos del análisis"""
-    st.header("📊 Resultados del Análisis")
+    """Muestra resultados completos del análisis - MEJORADO"""
+    st.header("📊 RESULTADOS DEL ANÁLISIS COMPLETO")
     
-    # Métricas principales
+    # Métricas principales mejoradas
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         biomasa_prom = gdf_analizado['biomasa_disponible_kg_ms_ha'].mean()
-        st.metric("Biomasa Disponible Prom", f"{biomasa_prom:.0f} kg MS/ha")
+        st.metric("Biomasa Disponible", f"{biomasa_prom:.0f} kg MS/ha")
     
     with col2:
+        disponibilidad_prom = gdf_analizado['disponibilidad_forrajera_kg_ms_ha'].mean()
+        st.metric("Disponibilidad Forrajera", f"{disponibilidad_prom:.0f} kg MS/ha")
+    
+    with col3:
         ev_total = gdf_analizado['carga_animal'].sum()
         st.metric("Capacidad Total", f"{ev_total:.1f} EV")
     
-    with col3:
-        dias_prom = gdf_analizado['dias_permanencia'].mean()
-        st.metric("Días Permanencia Prom", f"{dias_prom:.1f}")
-    
     with col4:
-        area_total = gdf_analizado['area_ha'].sum()
-        st.metric("Área Total", f"{area_total:.1f} ha")
+        dias_prom = gdf_analizado['dias_permanencia'].mean()
+        st.metric("Días Permanencia", f"{dias_prom:.1f}")
     
-    # Mapas de resultados
+    # Distribución de disponibilidad
+    st.subheader("📈 Distribución de Disponibilidad Forrajera")
+    distribucion = gdf_analizado['categoria_disponibilidad'].value_counts()
+    col_dist1, col_dist2, col_dist3 = st.columns(3)
+    
+    with col_dist1:
+        baja = distribucion.get('BAJA', 0)
+        st.metric("🔴 Baja", f"{baja} sub-lotes")
+    
+    with col_dist2:
+        media = distribucion.get('MEDIA', 0)
+        st.metric("🟡 Media", f"{media} sub-lotes")
+    
+    with col_dist3:
+        alta = distribucion.get('ALTA', 0)
+        st.metric("🟢 Alta", f"{alta} sub-lotes")
+    
+    # Mapas de resultados - AHORA FUNCIONALES
     if FOLIUM_AVAILABLE:
-        st.header("🗺️ Visualización de Resultados")
+        st.header("🗺️ VISUALIZACIÓN INTERACTIVA")
         
-        tab1, tab2, tab3 = st.tabs(["🌿 NDVI", "🐄 EV/ha", "📅 Días Permanencia"])
+        # Pestañas con mapas funcionales
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🌿 NDVI", 
+            "🐄 EV/ha", 
+            "📊 Disponibilidad",
+            "🌱 Recomendaciones Agroecológicas",
+            "📋 Resumen"
+        ])
         
         with tab1:
-            mapa_ndvi = crear_mapa_base(gdf_analizado)
+            st.subheader("🌿 ÍNDICE NDVI - ESTADO VEGETATIVO")
+            mapa_ndvi = crear_mapa_ndvi(gdf_analizado)
             if mapa_ndvi:
-                folium_static(mapa_ndvi, width=800, height=400)
+                folium_static(mapa_ndvi, width=800, height=500)
+            else:
+                st.warning("No se pudo generar el mapa de NDVI")
         
         with tab2:
-            mapa_ev = crear_mapa_base(gdf_analizado)
+            st.subheader("🐄 CAPACIDAD DE CARGA - EV/HA")
+            mapa_ev = crear_mapa_ev_ha(gdf_analizado)
             if mapa_ev:
-                folium_static(mapa_ev, width=800, height=400)
+                folium_static(mapa_ev, width=800, height=500)
+            else:
+                st.warning("No se pudo generar el mapa de EV/ha")
         
         with tab3:
-            mapa_dias = crear_mapa_base(gdf_analizado)
-            if mapa_dias:
-                folium_static(mapa_dias, width=800, height=400)
+            st.subheader("📊 DISPONIBILIDAD FORRAJERA")
+            mapa_disp = crear_mapa_disponibilidad(gdf_analizado)
+            if mapa_disp:
+                folium_static(mapa_disp, width=800, height=500)
+            else:
+                st.warning("No se pudo generar el mapa de disponibilidad")
+        
+        with tab4:
+            st.subheader("🌱 RECOMENDACIONES AGROECOLÓGICAS")
+            mapa_recom = crear_mapa_recomendaciones(gdf_analizado)
+            if mapa_recom:
+                folium_static(mapa_recom, width=800, height=500)
+            else:
+                st.warning("No se pudo generar el mapa de recomendaciones")
+            
+            # Recomendaciones detalladas
+            st.subheader("📝 RECOMENDACIONES DETALLADAS")
+            recomendaciones = _generar_recomendaciones_agroecologicas(gdf_analizado, config)
+            st.markdown(recomendaciones)
+        
+        with tab5:
+            st.subheader("📋 RESUMEN POR SUB-LOTE")
+            # Tabla de resultados completa
+            columnas = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 
+                       'biomasa_disponible_kg_ms_ha', 'disponibilidad_forrajera_kg_ms_ha',
+                       'categoria_disponibilidad', 'ev_ha', 'dias_permanencia', 'dias_autonomia']
+            
+            # Filtrar columnas que existen
+            columnas_existentes = [col for col in columnas if col in gdf_analizado.columns]
+            tabla = gdf_analizado[columnas_existentes].copy()
+            
+            # Renombrar columnas para mejor visualización
+            nombres_columnas = {
+                'id_subLote': 'Sub-Lote',
+                'area_ha': 'Área (ha)',
+                'tipo_superficie': 'Tipo Superficie',
+                'ndvi': 'NDVI',
+                'biomasa_disponible_kg_ms_ha': 'Biomasa (kg MS/ha)',
+                'disponibilidad_forrajera_kg_ms_ha': 'Disponibilidad (kg MS/ha)',
+                'categoria_disponibilidad': 'Categoría',
+                'ev_ha': 'EV/ha',
+                'dias_permanencia': 'Días Permanencia',
+                'dias_autonomia': 'Días Autonomía'
+            }
+            
+            tabla.columns = [nombres_columnas.get(col, col) for col in tabla.columns]
+            st.dataframe(tabla, use_container_width=True)
     
-    # Tabla de resultados
-    st.header("📋 Detalles por Sub-Lote")
-    columnas = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 
-                'biomasa_disponible_kg_ms_ha', 'ev_ha', 'dias_permanencia']
-    tabla = gdf_analizado[columnas].copy()
-    tabla.columns = ['Sub-Lote', 'Área (ha)', 'Tipo Superficie', 'NDVI', 
-                    'Biomasa (kg MS/ha)', 'EV/ha', 'Días Permanencia']
-    st.dataframe(tabla, use_container_width=True)
+    else:
+        st.warning("⚠️ Folium no está disponible. Los mapas interactivos no se mostrarán.")
     
     # Exportar datos
-    st.header("💾 Exportar Resultados")
-    col1, col2 = st.columns(2)
+    st.header("💾 EXPORTAR RESULTADOS")
+    col_exp1, col_exp2, col_exp3 = st.columns(3)
     
-    with col1:
-        csv = tabla.to_csv(index=False)
+    with col_exp1:
+        # CSV con todas las métricas
+        columnas_exportar = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 
+                           'biomasa_disponible_kg_ms_ha', 'disponibilidad_forrajera_kg_ms_ha',
+                           'categoria_disponibilidad', 'ev_ha', 'dias_permanencia', 'dias_autonomia']
+        columnas_exportar = [col for col in columnas_exportar if col in gdf_analizado.columns]
+        
+        csv = gdf_analizado[columnas_exportar].to_csv(index=False)
         st.download_button(
-            "📥 Descargar CSV",
+            "📥 Descargar CSV Completo",
             csv,
-            f"resultados_analisis_{config['tipo_pastura']}.csv",
+            f"resultados_completos_{config['tipo_pastura']}.csv",
             "text/csv"
         )
     
-    with col2:
+    with col_exp2:
+        # GeoJSON
         geojson = gdf_analizado.to_json()
         st.download_button(
             "📥 Descargar GeoJSON",
             geojson,
-            f"resultados_analisis_{config['tipo_pastura']}.geojson",
+            f"resultados_{config['tipo_pastura']}.geojson",
             "application/json"
         )
+    
+    with col_exp3:
+        # Resumen ejecutivo
+        if DOCX_AVAILABLE:
+            with st.spinner("Preparando resumen..."):
+                mapa_buffer = crear_mapa_detallado(gdf_analizado, config['tipo_pastura'])
+                informe_buffer = generar_informe_completo(gdf_analizado, config, mapa_buffer)
+                if informe_buffer:
+                    st.download_button(
+                        "📄 Descargar Informe DOCX",
+                        informe_buffer,
+                        f"informe_forrajero_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
 
 # Funciones auxiliares para mapas
 def crear_mapa_detallado(gdf_analizado, tipo_pastura):
