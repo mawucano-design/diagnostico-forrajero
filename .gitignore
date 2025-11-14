@@ -1,6 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
@@ -205,3 +205,81 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# =============================================================================
+# ARCHIVOS ESPECÍFICOS DEL ANALIZADOR FORRAJERO UNIFICADO
+# =============================================================================
+
+# Archivos temporales de análisis
+/temp/
+/tmp/
+*.tmp
+temp_*/
+
+# Archivos de datos grandes y shapefiles
+*.geojson
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.zip
+*.kml
+*.kmz
+
+# Cache de Streamlit
+.streamlit/cache/
+
+# Logs de la aplicación
+*.log
+logs/
+app.log
+
+# Archivos de backup
+*.backup
+*.bak
+*~
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos de credenciales - NUNCA SUBIR ESTOS
+.secrets.toml
+.secrets.toml.local
+secrets.toml
+sentinel_credentials*.py
+*password*
+*secret*
+*credential*
+*.key
+*.pem
+credentials.json
+service-account-key.json
+
+# Archivos de configuración local
+config.local.py
+settings.local.py
+
+# Archivos de datos de usuario
+/user_data/
+/uploads/
+/downloads/
+
+# Archivos de análisis temporales
+/analisis_temp/
+/output/
+/exports/
+
+# Cache de matplotlib
+.matplotlib/
+
+# Archivos de Jupyter
+*.ipynb
+.ipynb_checkpoints/
+
+# Archivos de IDE adicionales
+.ropeproject
+.mypy_cache/
+.pytype/
