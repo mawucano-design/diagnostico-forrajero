@@ -2,6 +2,7 @@
 """
 App completa actualizada: análisis forrajero + exportes + informe DOCX con recomendaciones
 (técnicas + prácticas regenerativas) y descarga automática.
+CON VISUALIZACIONES EN MAPAS BASE ESRI
 """
 
 import streamlit as st
@@ -30,7 +31,7 @@ try:
 except Exception:
     DOCX_AVAILABLE = False
 
-# Folium (opcional)
+# Folium para mapas ESRI
 try:
     import folium
     from streamlit_folium import st_folium
@@ -92,7 +93,7 @@ def login_section():
 # ---------- Session state ----------
 for key in [
     'authenticated', 'username', 'gdf_cargado', 'gdf_analizado', 'mapa_detallado_bytes',
-    'docx_buffer', 'analisis_completado', 'html_download_injected'
+    'docx_buffer', 'analisis_completado', 'html_download_injected', 'mapa_interactivo_analisis'
 ]:
     if key not in st.session_state:
         if key == 'authenticated':
@@ -128,15 +129,13 @@ with st.sidebar:
     
     st.markdown("---")
     st.header("⚙️ Configuración")
-    if FOLIUM_AVAILABLE:
-        st.subheader("🗺️ Mapa Base")
-        base_map_option = st.selectbox(
-            "Seleccionar mapa base:",
-            ["ESRI Satélite", "OpenStreetMap", "CartoDB Positron"],
-            index=0
-        )
-    else:
-        base_map_option = "ESRI Satélite"
+    
+    st.subheader("🗺️ Mapa Base")
+    base_map_option = st.selectbox(
+        "Seleccionar mapa base:",
+        ["ESRI Satélite", "ESRI Calles", "ESRI Topográfico", "ESRI Oscuro"],
+        index=0
+    )
 
     st.subheader("🛰️ Fuente de Datos Satelitales")
     fuente_satelital = st.selectbox(
@@ -176,26 +175,6 @@ with st.sidebar:
     st.subheader("📊 Parámetros Ganaderos")
     peso_promedio = st.slider("Peso promedio animal (kg):", 300, 600, 450)
     carga_animal = st.slider("Carga animal (cabezas):", 1, 1000, 100)
-    
-    # NUEVOS PARÁMETROS GANADEROS
-    st.subheader("🍽️ Parámetros de Consumo")
-    consumo_diario_kg = st.number_input(
-        "Consumo diario por animal (kg MS/día):", 
-        min_value=2.0, 
-        max_value=20.0, 
-        value=12.0, 
-        step=0.5,
-        help="Consumo promedio de materia seca por animal por día"
-    )
-    
-    eficiencia_cosecha = st.slider(
-        "Eficiencia de cosecha (%):", 
-        min_value=10, 
-        max_value=90, 
-        value=55, 
-        step=5,
-        help="Porcentaje de la biomasa disponible que los animales realmente consumen"
-    )
 
     st.subheader("🎯 División de Potrero")
     n_divisiones = st.slider("Número de sub-lotes:", min_value=4, max_value=64, value=24)
@@ -384,45 +363,34 @@ def simular_patrones_reales_con_suelo(id_subLote, x_norm, y_norm, fuente_satelit
     msavi2 = ndvi * 1.0
     return ndvi, evi, savi, bsi, ndbi, msavi2
 
-def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carga_animal, consumo_diario_kg, eficiencia_cosecha):
+def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carga_animal):
     params = obtener_parametros_forrajeros(tipo_pastura)
     metricas = []
-    eficiencia_decimal = eficiencia_cosecha / 100.0
-    
     for idx, row in gdf_analizado.iterrows():
         biomasa_disponible = row.get('biomasa_disponible_kg_ms_ha', 0)
         area_ha = row.get('area_ha', 0)
-        
-        # Usar consumo diario personalizado en lugar del cálculo por porcentaje
-        consumo_individual_kg = consumo_diario_kg
+        consumo_individual_kg = peso_promedio * params['CONSUMO_PORCENTAJE_PESO']
         biomasa_total_disponible = biomasa_disponible * area_ha
-        
-        # Aplicar eficiencia de cosecha a la biomasa disponible
-        biomasa_efectiva = biomasa_total_disponible * eficiencia_decimal
-        
-        if biomasa_efectiva > 0 and consumo_individual_kg > 0:
-            ev_por_dia = biomasa_efectiva * 0.001 / consumo_individual_kg
+        if biomasa_total_disponible > 0 and consumo_individual_kg > 0:
+            ev_por_dia = biomasa_total_disponible * 0.001 / consumo_individual_kg
             ev_soportable = ev_por_dia / params['TASA_UTILIZACION_RECOMENDADA']
             ev_soportable = max(0.01, ev_soportable)
         else:
             ev_soportable = 0.01
-            
         if ev_soportable > 0 and area_ha > 0:
             ev_ha = ev_soportable / area_ha
             ev_ha_display = ev_ha
         else:
             ev_ha_display = 0.01
-            
         if carga_animal > 0:
             consumo_total_diario = carga_animal * consumo_individual_kg
-            if consumo_total_diario > 0 and biomasa_efectiva > 0:
-                dias_permanencia = biomasa_efectiva / consumo_total_diario
+            if consumo_total_diario > 0 and biomasa_total_disponible > 0:
+                dias_permanencia = biomasa_total_disponible / consumo_total_diario
                 dias_permanencia = min(max(dias_permanencia, 0.1), 365)
             else:
                 dias_permanencia = 0.1
         else:
             dias_permanencia = 0.1
-            
         if biomasa_disponible >= 2000:
             estado_forrajero = 4
         elif biomasa_disponible >= 1200:
@@ -433,17 +401,14 @@ def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carg
             estado_forrajero = 1
         else:
             estado_forrajero = 0
-            
         metricas.append({
             'ev_soportable': round(ev_soportable, 2),
             'dias_permanencia': round(dias_permanencia, 1),
-            'tasa_utilizacion': round(min(1.0, (carga_animal * consumo_individual_kg) / max(1, biomasa_efectiva)), 3) if biomasa_efectiva>0 else 0,
+            'tasa_utilizacion': round(min(1.0, (carga_animal * consumo_individual_kg) / max(1, biomasa_total_disponible)), 3) if biomasa_total_disponible>0 else 0,
             'biomasa_total_kg': round(biomasa_total_disponible, 1),
-            'biomasa_efectiva_kg': round(biomasa_efectiva, 1),
             'consumo_individual_kg': round(consumo_individual_kg, 1),
             'estado_forrajero': estado_forrajero,
-            'ev_ha': round(ev_ha_display, 3),
-            'eficiencia_cosecha': eficiencia_cosecha
+            'ev_ha': round(ev_ha_display, 3)
         })
     return metricas
 
@@ -502,7 +467,153 @@ def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fe
         return []
 
 # -----------------------
-# MAPAS (MATPLOTLIB y FOLIUM)
+# MAPAS INTERACTIVOS CON ESRI
+# -----------------------
+def obtener_tiles_esri(base_map_name):
+    """Devuelve la URL y atribución para los mapas base de ESRI"""
+    esri_tiles = {
+        "ESRI Satélite": {
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            "attr": "Esri, Maxar, Earthstar Geographics"
+        },
+        "ESRI Calles": {
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+            "attr": "Esri, HERE, Garmin"
+        },
+        "ESRI Topográfico": {
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+            "attr": "Esri, HERE, Garmin"
+        },
+        "ESRI Oscuro": {
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            "attr": "Esri, HERE, Garmin"
+        }
+    }
+    return esri_tiles.get(base_map_name, esri_tiles["ESRI Satélite"])
+
+def crear_mapa_interactivo_base(gdf, base_map_name="ESRI Satélite"):
+    """Crea un mapa base interactivo con ESRI"""
+    if not FOLIUM_AVAILABLE or gdf is None or len(gdf)==0:
+        return None
+    
+    bounds = gdf.total_bounds
+    centroid = gdf.geometry.centroid.iloc[0]
+    m = folium.Map(location=[centroid.y, centroid.x], tiles=None, control_scale=True, zoom_start=12)
+    
+    # Añadir mapa base ESRI
+    tiles_config = obtener_tiles_esri(base_map_name)
+    folium.TileLayer(
+        tiles=tiles_config["url"],
+        attr=tiles_config["attr"],
+        name=base_map_name
+    ).add_to(m)
+    
+    # Añadir el polígono principal
+    folium.GeoJson(
+        gdf.__geo_interface__, 
+        name='Potrero',
+        style_function=lambda feature: {
+            'fillColor': 'blue',
+            'color': 'blue',
+            'weight': 2,
+            'fillOpacity': 0.1
+        },
+        tooltip=folium.GeoJsonTooltip(fields=[], aliases=[], labels=True)
+    ).add_to(m)
+    
+    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+    folium.LayerControl().add_to(m)
+    return m
+
+def crear_mapa_interactivo_analisis(gdf_analizado, base_map_name="ESRI Satélite", tipo_visualizacion="biomasa"):
+    """Crea un mapa interactivo con los resultados del análisis superpuestos sobre ESRI"""
+    if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado)==0:
+        return None
+    
+    bounds = gdf_analizado.total_bounds
+    centroid = gdf_analizado.geometry.centroid.iloc[0]
+    m = folium.Map(location=[centroid.y, centroid.x], tiles=None, control_scale=True, zoom_start=13)
+    
+    # Añadir mapa base ESRI
+    tiles_config = obtener_tiles_esri(base_map_name)
+    folium.TileLayer(
+        tiles=tiles_config["url"],
+        attr=tiles_config["attr"],
+        name=base_map_name
+    ).add_to(m)
+    
+    # Definir colores según el tipo de visualización
+    def get_color_by_analysis(feature, tipo_visualizacion):
+        if tipo_visualizacion == "biomasa":
+            biom = feature['properties'].get('biomasa_disponible_kg_ms_ha', 0)
+            if biom < 200:
+                return '#d73027'
+            elif biom < 600:
+                return '#fdae61'
+            elif biom < 1200:
+                return '#fee08b'
+            elif biom < 2000:
+                return '#a6d96a'
+            else:
+                return '#1a9850'
+        elif tipo_visualizacion == "ndvi":
+            ndvi = feature['properties'].get('ndvi', 0)
+            if ndvi < 0.2:
+                return '#d73027'
+            elif ndvi < 0.4:
+                return '#fdae61'
+            elif ndvi < 0.6:
+                return '#fee08b'
+            elif ndvi < 0.7:
+                return '#a6d96a'
+            else:
+                return '#1a9850'
+        elif tipo_visualizacion == "tipo_superficie":
+            tipo = feature['properties'].get('tipo_superficie', 'VEGETACION_ESCASA')
+            colores = {
+                'SUELO_DESNUDO': '#d73027',
+                'SUELO_PARCIAL': '#fdae61',
+                'VEGETACION_ESCASA': '#fee08b',
+                'VEGETACION_MODERADA': '#a6d96a',
+                'VEGETACION_DENSA': '#1a9850'
+            }
+            return colores.get(tipo, '#cccccc')
+        else:  # ev_ha
+            ev_ha = feature['properties'].get('ev_ha', 0)
+            if ev_ha < 0.5:
+                return '#d73027'
+            elif ev_ha < 1.0:
+                return '#fdae61'
+            elif ev_ha < 1.5:
+                return '#fee08b'
+            elif ev_ha < 2.0:
+                return '#a6d96a'
+            else:
+                return '#1a9850'
+    
+    # Añadir sub-lotes con colores según análisis
+    folium.GeoJson(
+        gdf_analizado.__geo_interface__,
+        name=f'Análisis - {tipo_visualizacion.title()}',
+        style_function=lambda feature: {
+            'fillColor': get_color_by_analysis(feature, tipo_visualizacion),
+            'color': 'black',
+            'weight': 1,
+            'fillOpacity': 0.7
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 'biomasa_disponible_kg_ms_ha', 'ev_ha', 'dias_permanencia'],
+            aliases=['Sub-lote:', 'Área (ha):', 'Tipo:', 'NDVI:', 'Biomasa (kg/ha):', 'EV/ha:', 'Días:'],
+            localize=True
+        )
+    ).add_to(m)
+    
+    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+    folium.LayerControl().add_to(m)
+    return m
+
+# -----------------------
+# MAPAS MATPLOTLIB (para informe)
 # -----------------------
 def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
     try:
@@ -544,7 +655,7 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         cmap_ev = LinearSegmentedColormap.from_list('ev_cmap', ['#d73027','#fee08b','#a6d96a','#1a9850'])
         for idx, row in gdf_analizado.iterrows():
             ev_ha = row.get('ev_ha', 0)
-            val = max(0, min(1, ev_ha/2.0))  # Normalizar considerando 2 EV/ha como máximo
+            val = max(0, min(1, ev_ha/2.0))
             color = cmap_ev(val)
             gdf_analizado.iloc[[idx]].plot(ax=ax3, color=color, edgecolor='black', linewidth=0.5)
             c = row.geometry.centroid
@@ -555,7 +666,7 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         cmap_dias = LinearSegmentedColormap.from_list('dias_cmap', ['#d73027','#fee08b','#a6d96a','#1a9850'])
         for idx, row in gdf_analizado.iterrows():
             dias = row.get('dias_permanencia', 0)
-            val = max(0, min(1, dias/60.0))  # Normalizar considerando 60 días como máximo
+            val = max(0, min(1, dias/60.0))
             color = cmap_dias(val)
             gdf_analizado.iloc[[idx]].plot(ax=ax4, color=color, edgecolor='black', linewidth=0.5)
             c = row.geometry.centroid
@@ -572,174 +683,10 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         st.error(f"❌ Error creando mapa detallado: {e}")
         return None
 
-def crear_mapa_interactivo_con_esri(gdf):
-    """Crea mapa interactivo con ESRI Satélite como base"""
-    if not FOLIUM_AVAILABLE or gdf is None or len(gdf)==0:
-        return None
-    
-    bounds = gdf.total_bounds
-    centroid = gdf.geometry.centroid.iloc[0]
-    m = folium.Map(
-        location=[centroid.y, centroid.x],
-        tiles=None,
-        control_scale=True,
-        zoom_start=12
-    )
-    
-    # Añadir ESRI Satélite como capa base
-    esri_satellite = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-    folium.TileLayer(
-        tiles=esri_satellite,
-        attr='Esri, Maxar, Earthstar Geographics',
-        name='ESRI Satellite',
-        overlay=False
-    ).add_to(m)
-    
-    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
-    return m
-
-def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
-    """Crea mapas de análisis superpuestos sobre ESRI Satélite - VERSIÓN SIMPLIFICADA"""
-    if not FOLIUM_AVAILABLE:
-        return None
-    
-    mapas = {}
-    
-    # Colores para los tipos de superficie
-    colores_superficie = {
-        'SUELO_DESNUDO': '#d73027',
-        'SUELO_PARCIAL': '#fdae61', 
-        'VEGETACION_ESCASA': '#fee08b',
-        'VEGETACION_MODERADA': '#a6d96a',
-        'VEGETACION_DENSA': '#1a9850'
-    }
-    
-    # Mapa 1: Tipos de Superficie
-    m1 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    
-    for idx, row in gdf_analizado.iterrows():
-        tipo = row.get('tipo_superficie', 'VEGETACION_ESCASA')
-        color = colores_superficie.get(tipo, '#cccccc')
-        
-        folium.GeoJson(
-            row.geometry.__geo_interface__,
-            style_function=lambda feature, color=color: {
-                'fillColor': color,
-                'color': 'black',
-                'weight': 1,
-                'fillOpacity': 0.7
-            },
-            tooltip=folium.GeoJsonTooltip(
-                fields=['id_subLote', 'tipo_superficie', 'ndvi', 'biomasa_disponible_kg_ms_ha'],
-                aliases=['Sub-lote:', 'Tipo:', 'NDVI:', 'Biomasa:'],
-                localize=True
-            )
-        ).add_to(m1)
-    
-    mapas['tipos_superficie'] = m1
-    
-    # Mapa 2: Biomasa Disponible
-    m2 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    
-    for idx, row in gdf_analizado.iterrows():
-        biom = row.get('biomasa_disponible_kg_ms_ha', 0)
-        # Escala de colores para biomasa
-        if biom < 600:
-            color = '#d73027'
-        elif biom < 1200:
-            color = '#fee08b'
-        elif biom < 2000:
-            color = '#a6d96a'
-        else:
-            color = '#1a9850'
-            
-        folium.GeoJson(
-            row.geometry.__geo_interface__,
-            style_function=lambda feature, color=color: {
-                'fillColor': color,
-                'color': 'black',
-                'weight': 1,
-                'fillOpacity': 0.7
-            },
-            tooltip=folium.GeoJsonTooltip(
-                fields=['id_subLote', 'biomasa_disponible_kg_ms_ha', 'tipo_superficie'],
-                aliases=['Sub-lote:', 'Biomasa (kg MS/ha):', 'Tipo:'],
-                localize=True
-            )
-        ).add_to(m2)
-    
-    mapas['biomasa'] = m2
-    
-    # Mapa 3: EV por Hectárea
-    m3 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    
-    for idx, row in gdf_analizado.iterrows():
-        ev_ha = row.get('ev_ha', 0)
-        # Escala de colores para EV/ha
-        if ev_ha < 0.5:
-            color = '#d73027'
-        elif ev_ha < 1.0:
-            color = '#fee08b'
-        elif ev_ha < 1.5:
-            color = '#a6d96a'
-        else:
-            color = '#1a9850'
-            
-        folium.GeoJson(
-            row.geometry.__geo_interface__,
-            style_function=lambda feature, color=color: {
-                'fillColor': color,
-                'color': 'black',
-                'weight': 1,
-                'fillOpacity': 0.7
-            },
-            tooltip=folium.GeoJsonTooltip(
-                fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha'],
-                aliases=['Sub-lote:', 'EV/ha:', 'Biomasa:'],
-                localize=True
-            )
-        ).add_to(m3)
-    
-    mapas['ev_ha'] = m3
-    
-    # Mapa 4: Días de Permanencia
-    m4 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    
-    for idx, row in gdf_analizado.iterrows():
-        dias = row.get('dias_permanencia', 0)
-        # Escala de colores para días
-        if dias < 15:
-            color = '#d73027'
-        elif dias < 30:
-            color = '#fee08b'
-        elif dias < 45:
-            color = '#a6d96a'
-        else:
-            color = '#1a9850'
-            
-        folium.GeoJson(
-            row.geometry.__geo_interface__,
-            style_function=lambda feature, color=color: {
-                'fillColor': color,
-                'color': 'black',
-                'weight': 1,
-                'fillOpacity': 0.7
-            },
-            tooltip=folium.GeoJsonTooltip(
-                fields=['id_subLote', 'dias_permanencia', 'ev_ha'],
-                aliases=['Sub-lote:', 'Días permanencia:', 'EV/ha:'],
-                localize=True
-            )
-        ).add_to(m4)
-    
-    mapas['dias_permanencia'] = m4
-    
-    return mapas
-
 # -----------------------
-# GENERAR INFORME DOCX (unificado técnico + práctico)
+# GENERAR INFORME DOCX
 # -----------------------
-def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_animal, fecha_imagen, consumo_diario_kg, eficiencia_cosecha):
+def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_animal, fecha_imagen):
     """Genera y devuelve un BytesIO con el DOCX que contiene el análisis y
        las secciones: técnico + orientaciones prácticas (ganadería regenerativa)."""
     if not DOCX_AVAILABLE:
@@ -754,8 +701,6 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
         doc.add_paragraph(f"Fuente de datos: {fuente_satelital}")
         doc.add_paragraph(f"Peso promedio animal: {peso_promedio} kg")
         doc.add_paragraph(f"Carga animal: {carga_animal} cabezas")
-        doc.add_paragraph(f"Consumo diario por animal: {consumo_diario_kg} kg MS/día")
-        doc.add_paragraph(f"Eficiencia de cosecha: {eficiencia_cosecha}%")
         doc.add_paragraph("")
 
         # Estadísticas
@@ -924,19 +869,8 @@ if uploaded_file is not None:
                 if FOLIUM_AVAILABLE:
                     st.markdown("---")
                     st.markdown("### 🗺️ Visualización del potrero (interactiva)")
-                    m = crear_mapa_interactivo_con_esri(gdf_loaded)
+                    m = crear_mapa_interactivo_base(gdf_loaded, base_map_option)
                     if m:
-                        # Añadir el polígono del potrero al mapa base
-                        folium.GeoJson(
-                            gdf_loaded.__geo_interface__, 
-                            name='Potrero',
-                            style_function=lambda feature: {
-                                'fillColor': 'blue',
-                                'color': 'blue',
-                                'weight': 3,
-                                'fillOpacity': 0.1
-                            }
-                        ).add_to(m)
                         st_folium(m, width=1200, height=500)
                 else:
                     st.info("Instalá folium y streamlit-folium para ver el mapa interactivo: pip install folium streamlit-folium")
@@ -970,7 +904,7 @@ if st.session_state.gdf_cargado is not None:
                                         gdf_sub.loc[gdf_sub.index[idx], k] = v
                                     except Exception:
                                         pass
-                        metricas = calcular_metricas_ganaderas(gdf_sub, tipo_pastura, peso_promedio, carga_animal, consumo_diario_kg, eficiencia_cosecha)
+                        metricas = calcular_metricas_ganaderas(gdf_sub, tipo_pastura, peso_promedio, carga_animal)
                         for idx, met in enumerate(metricas):
                             for k,v in met.items():
                                 try:
@@ -979,57 +913,65 @@ if st.session_state.gdf_cargado is not None:
                                     pass
                         st.session_state.gdf_analizado = gdf_sub
                         
-                        # Mostrar mapas de análisis en ESRI Satélite
+                        # Crear y mostrar mapas
                         st.markdown("---")
-                        st.markdown("### 🗺️ Mapas de Análisis (ESRI Satélite)")
+                        st.markdown("### 🗺️ Mapas de Análisis")
                         
-                        mapas_analisis = crear_mapas_analisis_esri(gdf_sub, tipo_pastura)
-                        if mapas_analisis:
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.markdown("#### 🌿 Tipos de Superficie")
-                                st_folium(mapas_analisis['tipos_superficie'], width=500, height=400)
-                                
-                                st.markdown("#### ⚡ EV por Hectárea")
-                                st_folium(mapas_analisis['ev_ha'], width=500, height=400)
-                                
-                            with col2:
-                                st.markdown("#### 📊 Biomasa Disponible")
-                                st_folium(mapas_analisis['biomasa'], width=500, height=400)
-                                
-                                st.markdown("#### 📅 Días de Permanencia")
-                                st_folium(mapas_analisis['dias_permanencia'], width=500, height=400)
-                        
-                        # También mantener el mapa detallado original
+                        # Mapa detallado (Matplotlib)
                         mapa_buf = crear_mapa_detallado_vegetacion(gdf_sub, tipo_pastura)
                         if mapa_buf is not None:
-                            st.markdown("---")
-                            st.markdown("### 📈 Vista Consolidada de Análisis")
                             st.image(mapa_buf, use_column_width=True, caption="Mapas de Análisis: Tipos de Superficie, Biomasa Disponible, EV/ha y Días de Permanencia")
                             st.session_state.mapa_detallado_bytes = mapa_buf
+                        
+                        # Mapas interactivos con ESRI
+                        if FOLIUM_AVAILABLE:
+                            st.markdown("#### 📊 Visualizaciones Interactivas sobre ESRI")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**🌱 Biomasa Disponible**")
+                                mapa_biomasa = crear_mapa_interactivo_analisis(gdf_sub, base_map_option, "biomasa")
+                                if mapa_biomasa:
+                                    st_folium(mapa_biomasa, width=400, height=300)
+                                
+                                st.markdown("**📈 NDVI**")
+                                mapa_ndvi = crear_mapa_interactivo_analisis(gdf_sub, base_map_option, "ndvi")
+                                if mapa_ndvi:
+                                    st_folium(mapa_ndvi, width=400, height=300)
+                            
+                            with col2:
+                                st.markdown("**🏞️ Tipo de Superficie**")
+                                mapa_tipo = crear_mapa_interactivo_analisis(gdf_sub, base_map_option, "tipo_superficie")
+                                if mapa_tipo:
+                                    st_folium(mapa_tipo, width=400, height=300)
+                                
+                                st.markdown("**🐄 EV por Hectárea**")
+                                mapa_ev = crear_mapa_interactivo_analisis(gdf_sub, base_map_option, "ev_ha")
+                                if mapa_ev:
+                                    st_folium(mapa_ev, width=400, height=300)
                         
                         # Exportes: GeoJSON y CSV
                         st.markdown("---")
                         st.markdown("### 📤 Exportar Resultados")
-                        try:
-                            geojson_str = gdf_sub.to_json()
-                            st.download_button("📤 Exportar GeoJSON", geojson_str,
-                                               f"analisis_{tipo_pastura}_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson",
-                                               "application/geo+json")
-                        except Exception as e:
-                            st.error(f"Error exportando GeoJSON: {e}")
-                        try:
-                            csv_bytes = gdf_sub.drop(columns=['geometry']).to_csv(index=False).encode('utf-8')
-                            st.download_button("📊 Exportar CSV", csv_bytes,
-                                               f"analisis_{tipo_pastura}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                                               "text/csv")
-                        except Exception as e:
-                            st.error(f"Error exportando CSV: {e}")
+                        col_export1, col_export2 = st.columns(2)
+                        with col_export1:
+                            try:
+                                geojson_str = gdf_sub.to_json()
+                                st.download_button("📤 Exportar GeoJSON", geojson_str,
+                                                   f"analisis_{tipo_pastura}_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson",
+                                                   "application/geo+json")
+                            except Exception as e:
+                                st.error(f"Error exportando GeoJSON: {e}")
+                        with col_export2:
+                            try:
+                                csv_bytes = gdf_sub.drop(columns=['geometry']).to_csv(index=False).encode('utf-8')
+                                st.download_button("📊 Exportar CSV", csv_bytes,
+                                                   f"analisis_{tipo_pastura}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                                                   "text/csv")
+                            except Exception as e:
+                                st.error(f"Error exportando CSV: {e}")
                         
                         # Mostrar tabla
-                        st.markdown("---")
-                        st.markdown("### 📋 Resumen por Sub-lote")
                         try:
                             columnas_detalle = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 'cobertura_vegetal',
                                                'biomasa_disponible_kg_ms_ha', 'ev_ha', 'dias_permanencia']
@@ -1042,7 +984,7 @@ if st.session_state.gdf_cargado is not None:
                         
                         # Generar informe DOCX automáticamente
                         if DOCX_AVAILABLE:
-                            docx_buf = generar_informe_forrajero_docx(gdf_sub, tipo_pastura, peso_promedio, carga_animal, fecha_imagen, consumo_diario_kg, eficiencia_cosecha)
+                            docx_buf = generar_informe_forrajero_docx(gdf_sub, tipo_pastura, peso_promedio, carga_animal, fecha_imagen)
                             if docx_buf is not None:
                                 st.session_state.docx_buffer = docx_buf
                                 b64 = base64.b64encode(docx_buf.getvalue()).decode()
