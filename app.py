@@ -573,16 +573,22 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         st.error(f"❌ Error creando mapa detallado: {e}")
         return None
 
-def crear_mapa_interactivo_con_esri(gdf, base_map_name="ESRI Satélite"):
-    """Crea mapa interactivo con ESRI Satélite como base"""
+def crear_mapa_base_esri(gdf):
+    """Crea un mapa base con ESRI Satélite"""
     if not FOLIUM_AVAILABLE or gdf is None or len(gdf)==0:
         return None
     
     bounds = gdf.total_bounds
     centroid = gdf.geometry.centroid.iloc[0]
-    m = folium.Map(location=[centroid.y, centroid.x], tiles=None, control_scale=True, zoom_start=12)
     
-    # Siempre usar ESRI Satélite como base para los mapas de análisis
+    m = folium.Map(
+        location=[centroid.y, centroid.x],
+        tiles=None,
+        control_scale=True,
+        zoom_start=12
+    )
+    
+    # Añadir ESRI Satélite como capa base
     esri_satellite = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
     folium.TileLayer(
         tiles=esri_satellite,
@@ -591,25 +597,56 @@ def crear_mapa_interactivo_con_esri(gdf, base_map_name="ESRI Satélite"):
         overlay=False
     ).add_to(m)
     
-    # Añadir el polígono del potrero
-    folium.GeoJson(
-        gdf.__geo_interface__, 
-        name='Potrero',
-        style_function=lambda feature: {
-            'fillColor': 'blue',
-            'color': 'blue',
-            'weight': 3,
-            'fillOpacity': 0.1
-        },
-        tooltip=folium.GeoJsonTooltip(fields=[], aliases=[], labels=True)
-    ).add_to(m)
-    
     m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
-    folium.LayerControl().add_to(m)
     return m
 
+def agregar_leyenda_color_continua(mapa, titulo, colores, etiquetas):
+    """Agrega una leyenda de colores continua al mapa"""
+    # Crear gradiente de colores
+    gradient = f"""
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 300px; height: 100px; 
+                background: linear-gradient(to right, {', '.join(colores)});
+                border: 2px solid grey; z-index: 9999; padding: 10px;
+                border-radius: 5px; font-family: Arial;">
+        <div style="position: absolute; top: -25px; left: 0; right: 0; 
+                    text-align: center; font-weight: bold;">{titulo}</div>
+        <div style="display: flex; justify-content: space-between; 
+                    position: absolute; bottom: -25px; left: 0; right: 0;">
+            <span>{etiquetas[0]}</span>
+            <span>{etiquetas[1]}</span>
+        </div>
+    </div>
+    """
+    mapa.get_root().html.add_child(folium.Element(gradient))
+
+def agregar_leyenda_categorias(mapa, titulo, colores_etiquetas):
+    """Agrega una leyenda de categorías al mapa"""
+    items_html = ""
+    for color, etiqueta in colores_etiquetas:
+        items_html += f"""
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 20px; height: 20px; background-color: {color}; 
+                        margin-right: 10px; border: 1px solid black;"></div>
+            <span>{etiqueta}</span>
+        </div>
+        """
+    
+    leyenda_html = f"""
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 250px; 
+                background: white; border: 2px solid grey; z-index: 9999; 
+                padding: 10px; border-radius: 5px; font-family: Arial;">
+        <div style="font-weight: bold; margin-bottom: 10px; text-align: center;">
+            {titulo}
+        </div>
+        {items_html}
+    </div>
+    """
+    mapa.get_root().html.add_child(folium.Element(leyenda_html))
+
 def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
-    """Crea mapas de análisis superpuestos sobre ESRI Satélite - CORREGIDO"""
+    """Crea mapas de análisis superpuestos sobre ESRI Satélite con leyendas"""
     if not FOLIUM_AVAILABLE:
         return None
     
@@ -634,10 +671,7 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
             gdf_copy[col] = 0
     
     # Mapa 1: Tipos de Superficie
-    m1 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    
-    # Crear un FeatureGroup para los sub-lotes
-    feature_group_tipos = folium.FeatureGroup(name='Tipos de Superficie')
+    m1 = crear_mapa_base_esri(gdf_analizado)
     
     for idx, row in gdf_copy.iterrows():
         tipo = row.get('tipo_superficie', 'VEGETACION_ESCASA')
@@ -671,14 +705,22 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
                 aliases=['Sub-lote:', 'Tipo:', 'NDVI:', 'Biomasa (kg MS/ha):'],
                 localize=True
             )
-        ).add_to(feature_group_tipos)
+        ).add_to(m1)
     
-    feature_group_tipos.add_to(m1)
+    # Agregar leyenda para tipos de superficie
+    leyenda_tipos = [
+        ('#d73027', 'Suelo Desnudo'),
+        ('#fdae61', 'Suelo Parcial'),
+        ('#fee08b', 'Vegetación Escasa'),
+        ('#a6d96a', 'Vegetación Moderada'),
+        ('#1a9850', 'Vegetación Densa')
+    ]
+    agregar_leyenda_categorias(m1, "Tipos de Superficie", leyenda_tipos)
+    
     mapas['tipos_superficie'] = m1
     
     # Mapa 2: Biomasa Disponible
-    m2 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    feature_group_biomasa = folium.FeatureGroup(name='Biomasa Disponible')
+    m2 = crear_mapa_base_esri(gdf_analizado)
     
     for idx, row in gdf_copy.iterrows():
         biom = row.get('biomasa_disponible_kg_ms_ha', 0)
@@ -717,14 +759,17 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
                 aliases=['Sub-lote:', 'Biomasa (kg MS/ha):', 'Tipo:'],
                 localize=True
             )
-        ).add_to(feature_group_biomasa)
+        ).add_to(m2)
     
-    feature_group_biomasa.add_to(m2)
+    # Agregar leyenda para biomasa
+    colores_biomasa = ['#d73027', '#fee08b', '#a6d96a', '#1a9850']
+    etiquetas_biomasa = ['< 600', '> 2000']
+    agregar_leyenda_color_continua(m2, "Biomasa (kg MS/ha)", colores_biomasa, etiquetas_biomasa)
+    
     mapas['biomasa'] = m2
     
     # Mapa 3: EV por Hectárea
-    m3 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    feature_group_ev = folium.FeatureGroup(name='EV por Hectárea')
+    m3 = crear_mapa_base_esri(gdf_analizado)
     
     for idx, row in gdf_copy.iterrows():
         ev_ha = row.get('ev_ha', 0)
@@ -763,14 +808,17 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
                 aliases=['Sub-lote:', 'EV/ha:', 'Biomasa (kg MS/ha):'],
                 localize=True
             )
-        ).add_to(feature_group_ev)
+        ).add_to(m3)
     
-    feature_group_ev.add_to(m3)
+    # Agregar leyenda para EV/ha
+    colores_ev = ['#d73027', '#fee08b', '#a6d96a', '#1a9850']
+    etiquetas_ev = ['< 0.5', '> 1.5']
+    agregar_leyenda_color_continua(m3, "EV por Hectárea", colores_ev, etiquetas_ev)
+    
     mapas['ev_ha'] = m3
     
     # Mapa 4: Días de Permanencia
-    m4 = crear_mapa_interactivo_con_esri(gdf_analizado)
-    feature_group_dias = folium.FeatureGroup(name='Días de Permanencia')
+    m4 = crear_mapa_base_esri(gdf_analizado)
     
     for idx, row in gdf_copy.iterrows():
         dias = row.get('dias_permanencia', 0)
@@ -809,9 +857,13 @@ def crear_mapas_analisis_esri(gdf_analizado, tipo_pastura):
                 aliases=['Sub-lote:', 'Días permanencia:', 'EV/ha:'],
                 localize=True
             )
-        ).add_to(feature_group_dias)
+        ).add_to(m4)
     
-    feature_group_dias.add_to(m4)
+    # Agregar leyenda para días de permanencia
+    colores_dias = ['#d73027', '#fee08b', '#a6d96a', '#1a9850']
+    etiquetas_dias = ['< 15', '> 45']
+    agregar_leyenda_color_continua(m4, "Días de Permanencia", colores_dias, etiquetas_dias)
+    
     mapas['dias_permanencia'] = m4
     
     return mapas
@@ -1004,8 +1056,19 @@ if uploaded_file is not None:
                 if FOLIUM_AVAILABLE:
                     st.markdown("---")
                     st.markdown("### 🗺️ Visualización del potrero (interactiva)")
-                    m = crear_mapa_interactivo_con_esri(gdf_loaded, base_map_option)
+                    m = crear_mapa_base_esri(gdf_loaded)
                     if m:
+                        # Añadir el polígono del potrero al mapa base
+                        folium.GeoJson(
+                            gdf_loaded.__geo_interface__, 
+                            name='Potrero',
+                            style_function=lambda feature: {
+                                'fillColor': 'blue',
+                                'color': 'blue',
+                                'weight': 3,
+                                'fillOpacity': 0.1
+                            }
+                        ).add_to(m)
                         st_folium(m, width=1200, height=500)
                 else:
                     st.info("Instalá folium y streamlit-folium para ver el mapa interactivo: pip install folium streamlit-folium")
@@ -1058,17 +1121,17 @@ if st.session_state.gdf_cargado is not None:
                             
                             with col1:
                                 st.markdown("#### 🌿 Tipos de Superficie")
-                                st_folium(mapas_analisis['tipos_superficie'], width=400, height=300)
+                                st_folium(mapas_analisis['tipos_superficie'], width=500, height=400)
                                 
                                 st.markdown("#### ⚡ EV por Hectárea")
-                                st_folium(mapas_analisis['ev_ha'], width=400, height=300)
+                                st_folium(mapas_analisis['ev_ha'], width=500, height=400)
                                 
                             with col2:
                                 st.markdown("#### 📊 Biomasa Disponible")
-                                st_folium(mapas_analisis['biomasa'], width=400, height=300)
+                                st_folium(mapas_analisis['biomasa'], width=500, height=400)
                                 
                                 st.markdown("#### 📅 Días de Permanencia")
-                                st_folium(mapas_analisis['dias_permanencia'], width=400, height=300)
+                                st_folium(mapas_analisis['dias_permanencia'], width=500, height=400)
                         
                         # También mantener el mapa detallado original
                         mapa_buf = crear_mapa_detallado_vegetacion(gdf_sub, tipo_pastura)
