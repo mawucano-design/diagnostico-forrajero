@@ -224,93 +224,99 @@ class SentinelHubProcessor:
             return 0.5  # Valor por defecto
 
 # =============================================================================
-# PARÁMETROS FORRAJEROS UNIFICADOS - MEJORADOS CON PERSONALIZACIÓN
+# PARÁMETROS FORRAJEROS UNIFICADOS - AJUSTADOS Y MÁS REALISTAS
 # =============================================================================
 
 PARAMETROS_FORRAJEROS = {
     'ALFALFA': {
-        'MS_POR_HA_OPTIMO': 4000,
-        'CRECIMIENTO_DIARIO': 80,
-        'CONSUMO_PORCENTAJE_PESO': 0.03,
-        'TASA_UTILIZACION_RECOMENDADA': 0.65,
-        'FACTOR_BIOMASA_NDVI': 2800,
-        'UMBRAL_NDVI_SUELO': 0.15,
-        'UMBRAL_NDVI_PASTURA': 0.45,
-        'CONSUMO_DIARIO_EV': 12,
-        'EFICIENCIA_PASTOREO': 0.75,
-        'EFICIENCIA_COSECHA': 0.70,
-        'DIGESTIBILIDAD': 0.65,
-        'PROTEINA_CRUDA': 0.18
+        'MS_POR_HA_OPTIMO': 4500,
+        'CRECIMIENTO_DIARIO': 85,
+        'CONSUMO_PORCENTAJE_PESO': 0.032,
+        'TASA_UTILIZACION_RECOMENDADA': 0.68,
+        'FACTOR_BIOMASA_NDVI': 3200,
+        'UMBRAL_NDVI_SUELO': 0.12,
+        'UMBRAL_NDVI_PASTURA': 0.42,
+        'CONSUMO_DIARIO_EV': 13,
+        'EFICIENCIA_PASTOREO': 0.78,
+        'EFICIENCIA_COSECHA': 0.72,
+        'DIGESTIBILIDAD': 0.68,
+        'PROTEINA_CRUDA': 0.20,
+        'CONSUMO_VOLUNTARIO': 3.2
     },
     'RAYGRASS': {
-        'MS_POR_HA_OPTIMO': 3500,
-        'CRECIMIENTO_DIARIO': 70,
-        'CONSUMO_PORCENTAJE_PESO': 0.028,
-        'TASA_UTILIZACION_RECOMENDADA': 0.60,
-        'FACTOR_BIOMASA_NDVI': 2500,
-        'UMBRAL_NDVI_SUELO': 0.18,
-        'UMBRAL_NDVI_PASTURA': 0.50,
-        'CONSUMO_DIARIO_EV': 10,
-        'EFICIENCIA_PASTOREO': 0.70,
-        'EFICIENCIA_COSECHA': 0.65,
-        'DIGESTIBILIDAD': 0.70,
-        'PROTEINA_CRUDA': 0.15
+        'MS_POR_HA_OPTIMO': 3800,
+        'CRECIMIENTO_DIARIO': 75,
+        'CONSUMO_PORCENTAJE_PESO': 0.029,
+        'TASA_UTILIZACION_RECOMENDADA': 0.62,
+        'FACTOR_BIOMASA_NDVI': 2800,
+        'UMBRAL_NDVI_SUELO': 0.15,
+        'UMBRAL_NDVI_PASTURA': 0.48,
+        'CONSUMO_DIARIO_EV': 11,
+        'EFICIENCIA_PASTOREO': 0.72,
+        'EFICIENCIA_COSECHA': 0.67,
+        'DIGESTIBILIDAD': 0.72,
+        'PROTEINA_CRUDA': 0.16,
+        'CONSUMO_VOLUNTARIO': 2.9
     },
     'FESTUCA': {
-        'MS_POR_HA_OPTIMO': 3000,
-        'CRECIMIENTO_DIARIO': 50,
-        'CONSUMO_PORCENTAJE_PESO': 0.025,
-        'TASA_UTILIZACION_RECOMENDADA': 0.55,
-        'FACTOR_BIOMASA_NDVI': 2200,
-        'UMBRAL_NDVI_SUELO': 0.20,
-        'UMBRAL_NDVI_PASTURA': 0.55,
-        'CONSUMO_DIARIO_EV': 9,
-        'EFICIENCIA_PASTOREO': 0.65,
-        'EFICIENCIA_COSECHA': 0.60,
-        'DIGESTIBILIDAD': 0.60,
-        'PROTEINA_CRUDA': 0.12
-    },
-    'AGROPIRRO': {
         'MS_POR_HA_OPTIMO': 3200,
         'CRECIMIENTO_DIARIO': 55,
         'CONSUMO_PORCENTAJE_PESO': 0.026,
         'TASA_UTILIZACION_RECOMENDADA': 0.58,
         'FACTOR_BIOMASA_NDVI': 2400,
-        'UMBRAL_NDVI_SUELO': 0.17,
+        'UMBRAL_NDVI_SUELO': 0.18,
         'UMBRAL_NDVI_PASTURA': 0.52,
         'CONSUMO_DIARIO_EV': 10,
         'EFICIENCIA_PASTOREO': 0.68,
         'EFICIENCIA_COSECHA': 0.62,
-        'DIGESTIBILIDAD': 0.55,
-        'PROTEINA_CRUDA': 0.10
+        'DIGESTIBILIDAD': 0.62,
+        'PROTEINA_CRUDA': 0.13,
+        'CONSUMO_VOLUNTARIO': 2.6
+    },
+    'AGROPIRRO': {
+        'MS_POR_HA_OPTIMO': 3500,
+        'CRECIMIENTO_DIARIO': 60,
+        'CONSUMO_PORCENTAJE_PESO': 0.027,
+        'TASA_UTILIZACION_RECOMENDADA': 0.60,
+        'FACTOR_BIOMASA_NDVI': 2600,
+        'UMBRAL_NDVI_SUELO': 0.16,
+        'UMBRAL_NDVI_PASTURA': 0.50,
+        'CONSUMO_DIARIO_EV': 10.5,
+        'EFICIENCIA_PASTOREO': 0.70,
+        'EFICIENCIA_COSECHA': 0.65,
+        'DIGESTIBILIDAD': 0.58,
+        'PROTEINA_CRUDA': 0.11,
+        'CONSUMO_VOLUNTARIO': 2.7
     },
     'PASTIZAL_NATURAL': {
-        'MS_POR_HA_OPTIMO': 2500,
-        'CRECIMIENTO_DIARIO': 40,
-        'CONSUMO_PORCENTAJE_PESO': 0.022,
-        'TASA_UTILIZACION_RECOMENDADA': 0.50,
-        'FACTOR_BIOMASA_NDVI': 2000,
-        'UMBRAL_NDVI_SUELO': 0.22,
-        'UMBRAL_NDVI_PASTURA': 0.48,
-        'CONSUMO_DIARIO_EV': 8,
-        'EFICIENCIA_PASTOREO': 0.60,
-        'EFICIENCIA_COSECHA': 0.55,
-        'DIGESTIBILIDAD': 0.50,
-        'PROTEINA_CRUDA': 0.08
+        'MS_POR_HA_OPTIMO': 2800,
+        'CRECIMIENTO_DIARIO': 45,
+        'CONSUMO_PORCENTAJE_PESO': 0.024,
+        'TASA_UTILIZACION_RECOMENDADA': 0.52,
+        'FACTOR_BIOMASA_NDVI': 2200,
+        'UMBRAL_NDVI_SUELO': 0.20,
+        'UMBRAL_NDVI_PASTURA': 0.46,
+        'CONSUMO_DIARIO_EV': 9,
+        'EFICIENCIA_PASTOREO': 0.65,
+        'EFICIENCIA_COSECHA': 0.58,
+        'DIGESTIBILIDAD': 0.52,
+        'PROTEINA_CRUDA': 0.09,
+        'CONSUMO_VOLUNTARIO': 2.4
     },
     'PERSONALIZADO': {
-        'MS_POR_HA_OPTIMO': 3000,
-        'CRECIMIENTO_DIARIO': 60,
-        'CONSUMO_PORCENTAJE_PESO': 0.025,
-        'TASA_UTILIZACION_RECOMENDADA': 0.55,
-        'FACTOR_BIOMASA_NDVI': 2300,
-        'UMBRAL_NDVI_SUELO': 0.18,
-        'UMBRAL_NDVI_PASTURA': 0.50,
-        'CONSUMO_DIARIO_EV': 10,
-        'EFICIENCIA_PASTOREO': 0.65,
-        'EFICIENCIA_COSECHA': 0.60,
-        'DIGESTIBILIDAD': 0.60,
-        'PROTEINA_CRUDA': 0.12
+        'MS_POR_HA_OPTIMO': 3500,
+        'CRECIMIENTO_DIARIO': 65,
+        'CONSUMO_PORCENTAJE_PESO': 0.028,
+        'TASA_UTILIZACION_RECOMENDADA': 0.60,
+        'FACTOR_BIOMASA_NDVI': 2500,
+        'UMBRAL_NDVI_SUELO': 0.16,
+        'UMBRAL_NDVI_PASTURA': 0.48,
+        'CONSUMO_DIARIO_EV': 11,
+        'EFICIENCIA_PASTOREO': 0.70,
+        'EFICIENCIA_COSECHA': 0.65,
+        'DIGESTIBILIDAD': 0.65,
+        'PROTEINA_CRUDA': 0.14,
+        'CONSUMO_VOLUNTARIO': 2.8
     }
 }
 
@@ -325,31 +331,40 @@ def obtener_parametros(tipo_pastura, parametros_personalizados=None):
         return PARAMETROS_FORRAJEROS.get(tipo_pastura, PARAMETROS_FORRAJEROS['FESTUCA'])
 
 # =============================================================================
-# FUNCIONES DE CÁLCULO UNIFICADAS - MEJORADAS
+# FUNCIONES DE CÁLCULO UNIFICADAS - MEJORADAS Y MÁS REALISTAS
 # =============================================================================
 
 def calcular_ev_ha(biomasa_disponible_kg_ms_ha, consumo_diario_ev, eficiencia_pastoreo=0.7):
+    """Calcula EV/ha con parámetros más realistas"""
     if consumo_diario_ev <= 0:
         return 0
+    # Cálculo más preciso considerando eficiencia de pastoreo
     ev_ha = (biomasa_disponible_kg_ms_ha * eficiencia_pastoreo) / consumo_diario_ev
-    return max(0, ev_ha)
+    return max(0, round(ev_ha, 2))
 
 def calcular_carga_animal_total(ev_ha, area_ha):
-    return ev_ha * area_ha
+    """Calcula carga animal total"""
+    return round(ev_ha * area_ha, 1)
 
 def calcular_dias_permanencia(biomasa_total_kg, consumo_total_diario, crecimiento_diario_kg=0):
+    """Calcula días de permanencia con crecimiento considerado"""
     if consumo_total_diario <= 0:
         return 0
+    
+    # Cálculo base
+    dias_base = biomasa_total_kg / consumo_total_diario
+    
     if crecimiento_diario_kg > 0:
-        # Ajustar por crecimiento durante el pastoreo
-        dias_estimados = biomasa_total_kg / consumo_total_diario
-        crecimiento_total = crecimiento_diario_kg * dias_estimados * 0.3  # Factor conservador
-        dias_ajustados = (biomasa_total_kg + crecimiento_total) / consumo_total_diario
-        return min(dias_ajustados, 365)  # Máximo 1 año
-    return min(biomasa_total_kg / consumo_total_diario, 365)
+        # Ajustar por crecimiento durante el pastoreo (modelo más realista)
+        factor_crecimiento = 0.25  # Factor conservador
+        crecimiento_efectivo = crecimiento_diario_kg * factor_crecimiento * dias_base
+        dias_ajustados = (biomasa_total_kg + crecimiento_efectivo) / consumo_total_diario
+        return min(round(dias_ajustados, 1), 120)  # Máximo 120 días
+    
+    return min(round(dias_base, 1), 120)
 
 def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura, parametros_personalizados=None):
-    """Calcula la disponibilidad forrajera con métricas mejoradas"""
+    """Calcula la disponibilidad forrajera con métricas mejoradas y más realistas"""
     params = obtener_parametros(tipo_pastura, parametros_personalizados)
     
     # Cálculos mejorados de disponibilidad considerando eficiencia de cosecha
@@ -357,24 +372,26 @@ def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura, parametros_pe
         gdf_analizado['biomasa_disponible_kg_ms_ha'] * 
         params['EFICIENCIA_PASTOREO'] * 
         params['EFICIENCIA_COSECHA']
-    )
+    ).round(0)
     
-    # Clasificación de disponibilidad
+    # Clasificación de disponibilidad MÁS REALISTA
     condiciones = [
-        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 500,
-        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 1500,
-        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] >= 1500
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 800,
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 2000,
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 3500,
+        gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] >= 3500
     ]
-    categorias = ['BAJA', 'MEDIA', 'ALTA']
+    categorias = ['MUY BAJA', 'BAJA', 'MEDIA', 'ALTA']
     gdf_analizado['categoria_disponibilidad'] = np.select(condiciones, categorias, default='MEDIA')
     
-    # Cálculo de días de autonomía
-    gdf_analizado['dias_autonomia'] = gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] / 30  # Consumo diario estimado
+    # Cálculo de días de autonomía más realista
+    consumo_promedio_diario = 25  # kg MS/día/EV (valor más realista)
+    gdf_analizado['dias_autonomia'] = (gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] / consumo_promedio_diario).round(1)
     
     return gdf_analizado
 
 # =============================================================================
-# FUNCIONES DE MAPAS UNIFICADAS - MEJORADAS CON LEYENDAS
+# FUNCIONES DE MAPAS UNIFICADAS - MEJORADAS CON LEYENDAS DETALLADAS
 # =============================================================================
 
 MAPAS_BASE = {
@@ -422,7 +439,7 @@ def crear_mapa_base(gdf, mapa_seleccionado="ESRI World Imagery", zoom_start=10):
     return m
 
 def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de NDVI con leyenda mejorada"""
+    """Crea mapa interactivo de NDVI con leyenda mejorada y más detallada"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -430,14 +447,22 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
     
     def estilo_ndvi(feature):
         ndvi = feature['properties']['ndvi']
-        if ndvi < 0.2:
-            color = '#8B4513'  # Marrón - suelo
+        if ndvi < 0.1:
+            color = '#8B4513'  # Marrón - suelo desnudo
+        elif ndvi < 0.2:
+            color = '#CD853F'  # Marrón claro - suelo con algo de vegetación
+        elif ndvi < 0.3:
+            color = '#FFD700'  # Amarillo - vegetación muy escasa
         elif ndvi < 0.4:
-            color = '#FFD700'  # Amarillo - vegetación escasa
-        elif ndvi < 0.6:
+            color = '#ADFF2F'  # Verde amarillento - vegetación escasa
+        elif ndvi < 0.5:
             color = '#32CD32'  # Verde claro - vegetación moderada
+        elif ndvi < 0.6:
+            color = '#228B22'  # Verde - vegetación buena
+        elif ndvi < 0.7:
+            color = '#006400'  # Verde oscuro - vegetación muy buena
         else:
-            color = '#006400'  # Verde oscuro - vegetación densa
+            color = '#004d00'  # Verde muy oscuro - vegetación excelente
             
         return {
             'fillColor': color,
@@ -450,37 +475,54 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
         gdf_analizado.__geo_interface__,
         style_function=estilo_ndvi,
         tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'ndvi', 'tipo_superficie'],
-            aliases=['Sub-Lote:', 'NDVI:', 'Tipo:'],
-            localize=True
+            fields=['id_subLote', 'ndvi', 'tipo_superficie', 'biomasa_disponible_kg_ms_ha'],
+            aliases=['Sub-Lote:', 'NDVI:', 'Tipo:', 'Biomasa (kg MS/ha):'],
+            localize=True,
+            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
         )
     ).add_to(m)
     
-    # Leyenda mejorada
+    # Leyenda MEJORADA con más categorías
     legend_html = '''
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 220px; 
+                bottom: 50px; left: 50px; width: 250px; 
                 background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:12px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
-            🌿 Índice NDVI
+                font-size:11px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+            🌿 ÍNDICE NDVI - ESTADO VEGETATIVO
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #8B4513; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>&lt; 0.2 - Suelo desnudo</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #8B4513; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>&lt; 0.1 - Suelo desnudo</span>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FFD700; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>0.2-0.4 - Vegetación escasa</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #CD853F; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.1-0.2 - Muy escasa</span>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #32CD32; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>0.4-0.6 - Vegetación moderada</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FFD700; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.2-0.3 - Escasa</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #ADFF2F; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.3-0.4 - Regular</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #32CD32; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.4-0.5 - Buena</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #228B22; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.5-0.6 - Muy Buena</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #006400; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.6-0.7 - Excelente</span>
         </div>
         <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background: #006400; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>&gt; 0.6 - Vegetación densa</span>
+            <div style="width: 18px; height: 12px; background: #004d00; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>&gt; 0.7 - Óptima</span>
         </div>
     </div>
     '''
@@ -489,7 +531,7 @@ def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de EV/ha con leyenda mejorada"""
+    """Crea mapa interactivo de EV/ha con leyenda mejorada y más realista"""
     if not FOLIUM_AVAILABLE:
         return None
         
@@ -497,14 +539,20 @@ def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
     
     def estilo_ev_ha(feature):
         ev_ha = feature['properties']['ev_ha']
-        if ev_ha < 0.5:
-            color = '#FF6B6B'  # Rojo - muy baja
-        elif ev_ha < 2.0:
-            color = '#FFA726'  # Naranja - baja
-        elif ev_ha < 4.0:
+        if ev_ha < 0.3:
+            color = '#FF4444'  # Rojo - muy baja
+        elif ev_ha < 0.8:
+            color = '#FF6B6B'  # Rojo claro - baja
+        elif ev_ha < 1.5:
+            color = '#FFA726'  # Naranja - moderada baja
+        elif ev_ha < 2.5:
             color = '#FFD54F'  # Amarillo - moderada
+        elif ev_ha < 3.5:
+            color = '#9CCC65'  # Verde claro - buena
+        elif ev_ha < 5.0:
+            color = '#66BB6A'  # Verde - muy buena
         else:
-            color = '#66BB6A'  # Verde - alta
+            color = '#2E7D32'  # Verde oscuro - excelente
             
         return {
             'fillColor': color,
@@ -517,37 +565,50 @@ def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
         gdf_analizado.__geo_interface__,
         style_function=estilo_ev_ha,
         tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha'],
-            aliases=['Sub-Lote:', 'EV/ha:', 'Biomasa:'],
-            localize=True
+            fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha', 'dias_permanencia'],
+            aliases=['Sub-Lote:', 'EV/ha:', 'Biomasa (kg MS/ha):', 'Días Permanencia:'],
+            localize=True,
+            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
         )
     ).add_to(m)
     
-    # Leyenda mejorada
+    # Leyenda MEJORADA con rangos más realistas
     legend_html = '''
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; 
+                bottom: 50px; left: 50px; width: 220px; 
                 background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:12px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
-            🐄 Capacidad de Carga
+                font-size:11px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+            🐄 CAPACIDAD DE CARGA (EV/ha)
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>&lt; 0.5 EV/ha</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FF4444; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>&lt; 0.3 - Muy Baja</span>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FFA726; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>0.5-2.0 EV/ha</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FF6B6B; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.3-0.8 - Baja</span>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FFD54F; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>2.0-4.0 EV/ha</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FFA726; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>0.8-1.5 - Moderada Baja</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FFD54F; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>1.5-2.5 - Moderada</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #9CCC65; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>2.5-3.5 - Buena</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #66BB6A; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>3.5-5.0 - Muy Buena</span>
         </div>
         <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background: #66BB6A; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>&gt; 4.0 EV/ha</span>
+            <div style="width: 18px; height: 12px; background: #2E7D32; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>&gt; 5.0 - Excelente</span>
         </div>
     </div>
     '''
@@ -564,12 +625,14 @@ def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
     
     def estilo_disponibilidad(feature):
         categoria = feature['properties']['categoria_disponibilidad']
-        if categoria == 'BAJA':
-            color = '#FF6B6B'  # Rojo
+        if categoria == 'MUY BAJA':
+            color = '#D32F2F'  # Rojo oscuro
+        elif categoria == 'BAJA':
+            color = '#FF5252'  # Rojo
         elif categoria == 'MEDIA':
-            color = '#FFD54F'  # Amarillo
+            color = '#FFEB3B'  # Amarillo
         else:
-            color = '#66BB6A'  # Verde
+            color = '#4CAF50'  # Verde
             
         return {
             'fillColor': color,
@@ -584,31 +647,36 @@ def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
         tooltip=folium.GeoJsonTooltip(
             fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
             aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad (kg MS/ha):', 'Días Autonomía:'],
-            localize=True
+            localize=True,
+            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
         )
     ).add_to(m)
     
-    # Leyenda mejorada
+    # Leyenda MEJORADA con valores específicos
     legend_html = '''
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 250px; 
+                bottom: 50px; left: 50px; width: 280px; 
                 background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:12px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
-            📊 Disponibilidad Forrajera
+                font-size:11px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+            📊 DISPONIBILIDAD FORRAJERA
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>Baja (&lt; 500 kg MS/ha)</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #D32F2F; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🔴 MUY BAJA (&lt; 800 kg MS/ha)</span>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FFD54F; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>Media (500-1500 kg MS/ha)</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FF5252; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🟠 BAJA (800-2000 kg MS/ha)</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FFEB3B; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🟡 MEDIA (2000-3500 kg MS/ha)</span>
         </div>
         <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background: #66BB6A; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>Alta (&gt; 1500 kg MS/ha)</span>
+            <div style="width: 18px; height: 12px; background: #4CAF50; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🟢 ALTA (&gt; 3500 kg MS/ha)</span>
         </div>
     </div>
     '''
@@ -625,12 +693,14 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
     
     def estilo_recomendaciones(feature):
         categoria = feature['properties']['categoria_disponibilidad']
-        if categoria == 'BAJA':
-            color = '#FF6B6B'  # Rojo - intervención urgente
+        if categoria == 'MUY BAJA':
+            color = '#D32F2F'  # Rojo oscuro - intervención urgente
+        elif categoria == 'BAJA':
+            color = '#FF9800'  # Naranja - manejo intensivo
         elif categoria == 'MEDIA':
-            color = '#FFD54F'  # Amarillo - manejo cuidadoso
+            color = '#FFEB3B'  # Amarillo - manejo cuidadoso
         else:
-            color = '#66BB6A'  # Verde - mantenimiento
+            color = '#4CAF50'  # Verde - mantenimiento
             
         return {
             'fillColor': color,
@@ -644,38 +714,43 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
         gdf_analizado.__geo_interface__,
         style_function=estilo_recomendaciones,
         tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha'],
-            aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad:'],
-            localize=True
+            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
+            aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad:', 'Autonomía (días):'],
+            localize=True,
+            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
         ),
         popup=folium.GeoJsonPopup(
-            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha'],
-            aliases=['Sub-Lote:', 'Estado:', 'Disponibilidad (kg MS/ha):'],
+            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'ev_ha'],
+            aliases=['Sub-Lote:', 'Estado:', 'Disponibilidad (kg MS/ha):', 'EV/ha:'],
             localize=True
         )
     ).add_to(m)
     
-    # Leyenda de recomendaciones mejorada
+    # Leyenda de recomendaciones MEJORADA
     legend_html = '''
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 280px; 
+                bottom: 50px; left: 50px; width: 300px; 
                 background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:12px; padding: 10px; border-radius: 5px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px;">
-            🌱 Recomendaciones Agroecológicas
+                font-size:11px; padding: 10px; border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.3);">
+        <div style="font-weight: bold; margin-bottom: 8px; text-align: center; font-size: 13px; color: #2E8B57;">
+            🌱 RECOMENDACIONES AGROECOLÓGICAS
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>🔴 Intervención Urgente</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #D32F2F; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🔴 INTERVENCIÓN URGENTE</span>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div style="width: 20px; height: 15px; background: #FFD54F; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>🟡 Manejo Cuidadoso</span>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FF9800; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🟠 MANEJO INTENSIVO</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 18px; height: 12px; background: #FFEB3B; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🟡 MANEJO CUIDADOSO</span>
         </div>
         <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background: #66BB6A; border: 1px solid #000; margin-right: 8px;"></div>
-            <span>🟢 Mantenimiento</span>
+            <div style="width: 18px; height: 12px; background: #4CAF50; border: 1px solid #000; margin-right: 6px;"></div>
+            <span>🟢 MANTENIMIENTO</span>
         </div>
     </div>
     '''
@@ -684,7 +759,7 @@ def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
     return m
 
 # =============================================================================
-# SISTEMA DE ANÁLISIS UNIFICADO - MEJORADO
+# SISTEMA DE ANÁLISIS UNIFICADO - MEJORADO CON PARÁMETROS REALISTAS
 # =============================================================================
 
 class AnalizadorForrajeroUnificado:
@@ -693,7 +768,7 @@ class AnalizadorForrajeroUnificado:
         self.sh_config.check_configuration()
     
     def analizar_potrero(self, gdf, config):
-        """Análisis completo unificado"""
+        """Análisis completo unificado con parámetros más realistas"""
         try:
             st.header("🌱 ANÁLISIS FORRAJERO UNIFICADO")
             
@@ -779,7 +854,7 @@ class AnalizadorForrajeroUnificado:
             return gdf.geometry.area / 10000
     
     def _obtener_datos_vegetacion(self, gdf, config):
-        """Obtiene datos de vegetación (simulado o real)"""
+        """Obtiene datos de vegetación (simulado o real) con parámetros realistas"""
         resultados = []
         processor = SentinelHubProcessor()
         parametros_personalizados = config.get('parametros_personalizados')
@@ -792,37 +867,51 @@ class AnalizadorForrajeroUnificado:
             
             ndvi = processor.get_ndvi_for_geometry(row.geometry, fecha_imagen, bbox)
             
-            # Calcular biomasa basada en NDVI
+            # Calcular biomasa basada en NDVI con parámetros realistas
             params = obtener_parametros(config['tipo_pastura'], parametros_personalizados)
-            biomasa_total = params['FACTOR_BIOMASA_NDVI'] * ndvi
+            
+            # Cálculo más realista de biomasa considerando relación NDVI-biomasa
+            if ndvi < params['UMBRAL_NDVI_SUELO']:
+                biomasa_total = params['FACTOR_BIOMASA_NDVI'] * 0.1  # Mínimo para suelo
+            elif ndvi < 0.3:
+                biomasa_total = params['FACTOR_BIOMASA_NDVI'] * ndvi * 0.8
+            elif ndvi < 0.6:
+                biomasa_total = params['FACTOR_BIOMASA_NDVI'] * ndvi * 1.2
+            else:
+                biomasa_total = params['FACTOR_BIOMASA_NDVI'] * ndvi * 1.5
+            
             biomasa_disponible = biomasa_total * params['TASA_UTILIZACION_RECOMENDADA']
             
-            # Clasificar vegetación
+            # Clasificar vegetación más detallada
             if ndvi < params['UMBRAL_NDVI_SUELO']:
                 tipo_veg = "SUELO_DESNUDO"
+            elif ndvi < 0.25:
+                tipo_veg = "VEGETACION_MUY_ESCASA"
             elif ndvi < params['UMBRAL_NDVI_PASTURA']:
                 tipo_veg = "VEGETACION_ESCASA"
+            elif ndvi < 0.6:
+                tipo_veg = "VEGETACION_MODERADA"
             else:
                 tipo_veg = "VEGETACION_DENSA"
             
             resultados.append({
                 'id_subLote': row['id_subLote'],
-                'ndvi': ndvi,
+                'ndvi': round(ndvi, 3),
                 'tipo_superficie': tipo_veg,
-                'biomasa_total_kg_ms_ha': biomasa_total,
-                'biomasa_disponible_kg_ms_ha': biomasa_disponible,
-                'cobertura_vegetal': max(0.1, min(0.95, ndvi * 1.2))
+                'biomasa_total_kg_ms_ha': round(biomasa_total, 0),
+                'biomasa_disponible_kg_ms_ha': round(biomasa_disponible, 0),
+                'cobertura_vegetal': round(max(0.1, min(0.95, ndvi * 1.3)), 2)
             })
         
         return resultados
     
     def _calcular_metricas_ganaderas(self, gdf, resultados, config):
-        """Calcula todas las métricas ganaderas"""
+        """Calcula todas las métricas ganaderas con parámetros realistas"""
         parametros_personalizados = config.get('parametros_personalizados')
         params = obtener_parametros(config['tipo_pastura'], parametros_personalizados)
         
         # Usar consumo personalizado si está disponible
-        consumo_diario_personalizado = config.get('consumo_voluntario', params['CONSUMO_DIARIO_EV'])
+        consumo_diario_personalizado = config.get('consumo_voluntario', params.get('CONSUMO_VOLUNTARIO', 10))
         eficiencia_pastoreo_personalizada = config.get('eficiencia_pastoreo', params['EFICIENCIA_PASTOREO'])
         eficiencia_cosecha_personalizada = config.get('eficiencia_cosecha', params['EFICIENCIA_COSECHA'])
         
@@ -830,13 +919,13 @@ class AnalizadorForrajeroUnificado:
             area_ha = gdf.loc[gdf.index[idx], 'area_ha']
             biomasa_disponible = resultado['biomasa_disponible_kg_ms_ha']
             
-            # EV/ha con parámetros personalizados
+            # EV/ha con parámetros personalizados - cálculo más realista
             ev_ha = calcular_ev_ha(biomasa_disponible, consumo_diario_personalizado, eficiencia_pastoreo_personalizada)
             
             # Carga animal
             carga_animal = calcular_carga_animal_total(ev_ha, area_ha)
             
-            # Días de permanencia
+            # Días de permanencia con cálculo mejorado
             biomasa_total_kg = biomasa_disponible * area_ha
             consumo_individual_kg = config['peso_promedio'] * params['CONSUMO_PORCENTAJE_PESO']
             consumo_total_diario = config['carga_animal'] * consumo_individual_kg
@@ -855,13 +944,13 @@ class AnalizadorForrajeroUnificado:
             gdf.loc[gdf.index[idx], 'ev_ha'] = ev_ha
             gdf.loc[gdf.index[idx], 'carga_animal'] = carga_animal
             gdf.loc[gdf.index[idx], 'dias_permanencia'] = dias_permanencia
-            gdf.loc[gdf.index[idx], 'consumo_individual_kg'] = consumo_individual_kg
-            gdf.loc[gdf.index[idx], 'biomasa_total_kg'] = biomasa_total_kg
+            gdf.loc[gdf.index[idx], 'consumo_individual_kg'] = round(consumo_individual_kg, 2)
+            gdf.loc[gdf.index[idx], 'biomasa_total_kg'] = round(biomasa_total_kg, 0)
         
         return gdf
 
 # =============================================================================
-# GENERACIÓN DE INFORMES - MEJORADA
+# GENERACIÓN DE INFORMES - MEJORADA CON PARÁMETROS REALISTAS
 # =============================================================================
 
 def crear_mapa_detallado(gdf_analizado, tipo_pastura):
@@ -957,7 +1046,7 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
     
     recomendaciones = []
     
-    if disponibilidad_prom < 500:
+    if disponibilidad_prom < 800:
         recomendaciones.extend([
             "🔴 **ESTADO CRÍTICO - INTERVENCIÓN AGROECOLÓGICA URGENTE**",
             "",
@@ -977,9 +1066,9 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
             "• Proteger cursos de agua con franjas buffer",
             "• Utilizar coberturas para retener humedad"
         ])
-    elif disponibilidad_prom < 1500:
+    elif disponibilidad_prom < 2000:
         recomendaciones.extend([
-            "🟡 **ESTADO DE MEJORA - MANEJO AGROECOLÓGICO ACTIVO**",
+            "🟠 **ESTADO DE MEJORA - MANEJO AGROECOLÓGICO ACTIVO**",
             "",
             "🌱 **PRÁCTICAS REGENERATIVAS:**",
             "• Mantener rotaciones con 45-60 días de descanso",
@@ -1037,7 +1126,7 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
     return "\n".join(recomendaciones)
 
 # =============================================================================
-# INTERFAZ PRINCIPAL - MEJORADA CON PARÁMETROS PERSONALIZADOS
+# INTERFAZ PRINCIPAL - MEJORADA CON PARÁMETROS REALISTAS
 # =============================================================================
 
 def main_application():
@@ -1107,7 +1196,7 @@ def main_application():
         st.markdown("---")
         
         # =============================================================================
-        # 🌿 PARÁMETROS FORRAJEROS - MEJORADO CON PERSONALIZACIÓN
+        # 🌿 PARÁMETROS FORRAJEROS - MEJORADO CON PERSONALIZACIÓN Y MÁS REALISTAS
         # =============================================================================
         st.header("🌿 Parámetros Forrajeros")
         tipo_pastura = st.selectbox(
@@ -1122,46 +1211,46 @@ def main_application():
                 st.subheader("📊 Parámetros de Producción")
                 parametros_personalizados['MS_POR_HA_OPTIMO'] = st.number_input(
                     "Biomasa Óptima (kg MS/ha):",
-                    min_value=1000, max_value=10000, value=3000, step=100,
+                    min_value=1000, max_value=10000, value=3500, step=100,
                     help="Materia seca óptima por hectárea"
                 )
                 parametros_personalizados['CRECIMIENTO_DIARIO'] = st.number_input(
                     "Crecimiento Diario (kg MS/ha/día):",
-                    min_value=10, max_value=300, value=60, step=5,
+                    min_value=10, max_value=300, value=65, step=5,
                     help="Crecimiento diario de materia seca"
                 )
                 parametros_personalizados['FACTOR_BIOMASA_NDVI'] = st.number_input(
                     "Factor Biomasa-NDVI:",
-                    min_value=1000, max_value=5000, value=2300, step=100,
+                    min_value=1000, max_value=5000, value=2500, step=100,
                     help="Factor de conversión de NDVI a biomasa"
                 )
                 
                 st.subheader("🌿 Parámetros de Calidad")
                 parametros_personalizados['DIGESTIBILIDAD'] = st.slider(
                     "Digestibilidad (%):",
-                    min_value=0.3, max_value=0.8, value=0.6, step=0.05,
+                    min_value=0.3, max_value=0.8, value=0.65, step=0.05,
                     help="Porcentaje de digestibilidad del forraje"
                 )
                 parametros_personalizados['PROTEINA_CRUDA'] = st.slider(
                     "Proteína Cruda (%):",
-                    min_value=0.05, max_value=0.25, value=0.12, step=0.01,
+                    min_value=0.05, max_value=0.25, value=0.14, step=0.01,
                     help="Contenido de proteína cruda"
                 )
                 
                 st.subheader("📏 Umbrales de Detección")
                 parametros_personalizados['UMBRAL_NDVI_SUELO'] = st.slider(
                     "Umbral NDVI Suelo:",
-                    min_value=0.05, max_value=0.3, value=0.18, step=0.01,
+                    min_value=0.05, max_value=0.3, value=0.16, step=0.01,
                     help="NDVI por debajo de este valor se considera suelo desnudo"
                 )
                 parametros_personalizados['UMBRAL_NDVI_PASTURA'] = st.slider(
                     "Umbral NDVI Pastura:",
-                    min_value=0.3, max_value=0.8, value=0.50, step=0.01,
+                    min_value=0.3, max_value=0.8, value=0.48, step=0.01,
                     help="NDVI por encima de este valor se considera vegetación densa"
                 )
         
         # =============================================================================
-        # 🐄 PARÁMETROS GANADEROS - MEJORADO CON CONSUMO VOLUNTARIO
+        # 🐄 PARÁMETROS GANADEROS - MEJORADO CON CONSUMO VOLUNTARIO REALISTA
         # =============================================================================
         st.header("🐄 Parámetros Ganaderos")
         peso_promedio = st.slider("Peso promedio (kg):", 300, 600, 450)
@@ -1171,20 +1260,20 @@ def main_application():
             st.subheader("Consumo Animal")
             consumo_voluntario = st.number_input(
                 "Consumo Voluntario (kg MS/día/animal):",
-                min_value=8.0, max_value=15.0, value=10.0, step=0.5,
+                min_value=8.0, max_value=15.0, value=11.0, step=0.5,
                 help="Consumo diario de materia seca por animal"
             )
             
             st.subheader("Eficiencias")
             eficiencia_pastoreo = st.slider(
                 "Eficiencia de Pastoreo (%):",
-                min_value=50, max_value=90, value=65, step=5,
+                min_value=50, max_value=90, value=70, step=5,
                 help="Porcentaje de forraje que realmente consume el animal"
             ) / 100.0
             
             eficiencia_cosecha = st.slider(
                 "Eficiencia de Cosecha (%):",
-                min_value=50, max_value=90, value=60, step=5,
+                min_value=50, max_value=90, value=65, step=5,
                 help="Porcentaje de biomasa que se puede cosechar eficientemente"
             ) / 100.0
         
@@ -1328,17 +1417,21 @@ def mostrar_resultados_completos(gdf_analizado, config):
     # Distribución de disponibilidad
     st.subheader("📈 Distribución de Disponibilidad Forrajera")
     distribucion = gdf_analizado['categoria_disponibilidad'].value_counts()
-    col_dist1, col_dist2, col_dist3 = st.columns(3)
+    col_dist1, col_dist2, col_dist3, col_dist4 = st.columns(4)
     
     with col_dist1:
-        baja = distribucion.get('BAJA', 0)
-        st.metric("🔴 Baja", f"{baja} sub-lotes")
+        muy_baja = distribucion.get('MUY BAJA', 0)
+        st.metric("🔴 Muy Baja", f"{muy_baja} sub-lotes")
     
     with col_dist2:
+        baja = distribucion.get('BAJA', 0)
+        st.metric("🟠 Baja", f"{baja} sub-lotes")
+    
+    with col_dist3:
         media = distribucion.get('MEDIA', 0)
         st.metric("🟡 Media", f"{media} sub-lotes")
     
-    with col_dist3:
+    with col_dist4:
         alta = distribucion.get('ALTA', 0)
         st.metric("🟢 Alta", f"{alta} sub-lotes")
     
