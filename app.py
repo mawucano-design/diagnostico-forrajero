@@ -472,7 +472,9 @@ def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fe
 # -----------------------
 def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
     try:
-        fig, (ax1, ax2) = plt.subplots(1,2,figsize=(18,9))
+        fig, (ax1, ax2, ax3, ax4) = plt.subplots(2, 2, figsize=(20, 16))
+        
+        # Mapa 1: Tipos de Superficie
         colores_superficie = {
             'SUELO_DESNUDO': '#d73027',
             'SUELO_PARCIAL': '#fdae61',
@@ -483,19 +485,48 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         for idx, row in gdf_analizado.iterrows():
             tipo = row.get('tipo_superficie', 'VEGETACION_ESCASA')
             color = colores_superficie.get(tipo, '#cccccc')
-            gdf_analizado.iloc[[idx]].plot(ax=ax1, color=color, edgecolor='black')
+            gdf_analizado.iloc[[idx]].plot(ax=ax1, color=color, edgecolor='black', linewidth=0.5)
             c = row.geometry.centroid
-            ax1.text(c.x, c.y, f"S{row['id_subLote']}", fontsize=7)
-        ax1.set_title(f"Tipos de Superficie - {tipo_pastura}")
-        cmap = LinearSegmentedColormap.from_list('b', ['#d73027','#fee08b','#a6d96a','#1a9850'])
+            ax1.text(c.x, c.y, f"S{row['id_subLote']}", fontsize=6, ha='center', va='center')
+        ax1.set_title(f"Tipos de Superficie - {tipo_pastura}", fontsize=14, fontweight='bold')
+        
+        # Leyenda para tipos de superficie
+        patches = [mpatches.Patch(color=color, label=label) for label, color in colores_superficie.items()]
+        ax1.legend(handles=patches, loc='upper right', fontsize=8)
+
+        # Mapa 2: Biomasa Disponible
+        cmap_biomasa = LinearSegmentedColormap.from_list('biomasa_cmap', ['#d73027','#fee08b','#a6d96a','#1a9850'])
         for idx, row in gdf_analizado.iterrows():
-            biom = row.get('biomasa_disponible_kg_ms_ha',0)
+            biom = row.get('biomasa_disponible_kg_ms_ha', 0)
             val = max(0, min(1, biom/4000))
-            color = cmap(val)
-            gdf_analizado.iloc[[idx]].plot(ax=ax2, color=color, edgecolor='black')
+            color = cmap_biomasa(val)
+            gdf_analizado.iloc[[idx]].plot(ax=ax2, color=color, edgecolor='black', linewidth=0.5)
             c = row.geometry.centroid
-            ax2.text(c.x, c.y, f"{biom:.0f}", fontsize=7)
-        ax2.set_title("Biomasa Disponible (kg MS/ha)")
+            ax2.text(c.x, c.y, f"{biom:.0f}", fontsize=6, ha='center', va='center')
+        ax2.set_title("Biomasa Disponible (kg MS/ha)", fontsize=14, fontweight='bold')
+
+        # Mapa 3: EV por Hectárea
+        cmap_ev = LinearSegmentedColormap.from_list('ev_cmap', ['#d73027','#fee08b','#a6d96a','#1a9850'])
+        for idx, row in gdf_analizado.iterrows():
+            ev_ha = row.get('ev_ha', 0)
+            val = max(0, min(1, ev_ha/2.0))  # Normalizar considerando 2 EV/ha como máximo
+            color = cmap_ev(val)
+            gdf_analizado.iloc[[idx]].plot(ax=ax3, color=color, edgecolor='black', linewidth=0.5)
+            c = row.geometry.centroid
+            ax3.text(c.x, c.y, f"{ev_ha:.2f}", fontsize=6, ha='center', va='center')
+        ax3.set_title("Equivalente Vaca por Hectárea (EV/ha)", fontsize=14, fontweight='bold')
+
+        # Mapa 4: Días de Permanencia
+        cmap_dias = LinearSegmentedColormap.from_list('dias_cmap', ['#d73027','#fee08b','#a6d96a','#1a9850'])
+        for idx, row in gdf_analizado.iterrows():
+            dias = row.get('dias_permanencia', 0)
+            val = max(0, min(1, dias/60.0))  # Normalizar considerando 60 días como máximo
+            color = cmap_dias(val)
+            gdf_analizado.iloc[[idx]].plot(ax=ax4, color=color, edgecolor='black', linewidth=0.5)
+            c = row.geometry.centroid
+            ax4.text(c.x, c.y, f"{dias:.0f}", fontsize=6, ha='center', va='center')
+        ax4.set_title("Días de Permanencia", fontsize=14, fontweight='bold')
+
         plt.tight_layout()
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
@@ -512,9 +543,21 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
     bounds = gdf.total_bounds
     centroid = gdf.geometry.centroid.iloc[0]
     m = folium.Map(location=[centroid.y, centroid.x], tiles=None, control_scale=True)
-    ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-    folium.TileLayer(ESRI, attr='Esri', name='ESRI Satellite', overlay=False).add_to(m)
-    folium.GeoJson(gdf.__geo_interface__, name='Polígono', style_function=lambda feat: {'color':'blue','weight':2,'fillOpacity':0.2}).add_to(m)
+    
+    # Definir mapas base
+    if base_map_name == "ESRI Satélite":
+        tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y/{x}'
+        attr = 'Esri'
+    elif base_map_name == "OpenStreetMap":
+        tiles = 'OpenStreetMap'
+        attr = 'OpenStreetMap'
+    else:  # CartoDB Positron
+        tiles = 'CartoDB positron'
+        attr = 'CartoDB'
+    
+    folium.TileLayer(tiles, attr=attr, name=base_map_name).add_to(m)
+    folium.GeoJson(gdf.__geo_interface__, name='Polígono', 
+                   style_function=lambda feat: {'color':'blue','weight':2,'fillOpacity':0.2}).add_to(m)
     m.fit_bounds([[bounds[1], bounds[0]],[bounds[3], bounds[2]]])
     folium.LayerControl().add_to(m)
     return m
@@ -546,8 +589,9 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
             ndvi_prom = float(gdf['ndvi'].mean())
             dias_prom = float(gdf['dias_permanencia'].mean())
             ev_total = float(gdf['ev_soportable'].sum())
+            ev_ha_prom = float(gdf['ev_ha'].mean())
         except Exception:
-            area_total = biomasa_prom = ndvi_prom = dias_prom = ev_total = 0.0
+            area_total = biomasa_prom = ndvi_prom = dias_prom = ev_total = ev_ha_prom = 0.0
 
         doc.add_heading("Resumen del Análisis", level=1)
         doc.add_paragraph(f"Área total (ha): {area_total:.2f}")
@@ -555,12 +599,13 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
         doc.add_paragraph(f"NDVI promedio: {ndvi_prom:.3f}")
         doc.add_paragraph(f"Días de permanencia promedio: {dias_prom:.1f}")
         doc.add_paragraph(f"Equivalente Vaca (EV) total: {ev_total:.2f}")
+        doc.add_paragraph(f"EV por hectárea promedio: {ev_ha_prom:.2f}")
         doc.add_paragraph("")
 
         # Tabla resumen por sub-lote (primeras 20)
         doc.add_heading("Resultados por Sub-lote (primeras 20 filas)", level=1)
         columnas = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 'cobertura_vegetal',
-                   'biomasa_disponible_kg_ms_ha', 'dias_permanencia', 'ev_ha']
+                   'biomasa_disponible_kg_ms_ha', 'ev_ha', 'dias_permanencia']
         cols_presentes = [c for c in columnas if c in gdf.columns]
         table = doc.add_table(rows=1, cols=len(cols_presentes))
         hdr = table.rows[0].cells
@@ -748,7 +793,7 @@ if st.session_state.gdf_cargado is not None:
                         st.session_state.gdf_analizado = gdf_sub
                         mapa_buf = crear_mapa_detallado_vegetacion(gdf_sub, tipo_pastura)
                         if mapa_buf is not None:
-                            st.image(mapa_buf, use_column_width=True)
+                            st.image(mapa_buf, use_column_width=True, caption="Mapas de Análisis: Tipos de Superficie, Biomasa Disponible, EV/ha y Días de Permanencia")
                             st.session_state.mapa_detallado_bytes = mapa_buf
                         # Exportes: GeoJSON y CSV
                         try:
