@@ -93,7 +93,8 @@ def login_section():
 # ---------- Session state ----------
 for key in [
     'authenticated', 'username', 'gdf_cargado', 'gdf_analizado', 'mapa_detallado_bytes',
-    'docx_buffer', 'analisis_completado', 'html_download_injected', 'mapa_interactivo_analisis'
+    'docx_buffer', 'analisis_completado', 'html_download_injected', 'mapa_interactivo_analisis',
+    'analisis_ejecutado', 'mostrar_resultados'
 ]:
     if key not in st.session_state:
         if key == 'authenticated':
@@ -818,7 +819,7 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
             doc.add_paragraph("Estado: MEJORA / INTERMEDIO. Recomendaciones técnicas:")
             doc.add_paragraph("• Implementar rotación con alta densidad temporal por períodos cortos (1–3 días) y descansos moderados (45–75 días).")
             doc.add_paragraph("• Monitorear crecimiento y ajustar la duración del pastoreo según rebrote.")
-            doc.add_paragraph("• Introducir o favorecer mezcla de gramíneas y leguminosas para mejorar calidad y fijación de N.")
+            doc.add_paragraph("• Introducir o favorecer mezcla de gramíneas and leguminosas para mejorar calidad y fijación de N.")
             doc.add_paragraph("• Promover prácticas que aumenten la retención de humedad y materia orgánica (coberturas, mulch).")
         else:
             doc.add_paragraph("Estado: CONSERVACIÓN / ÓPTIMO. Recomendaciones técnicas:")
@@ -906,12 +907,14 @@ if st.session_state.gdf_cargado is not None:
     st.markdown("---")
     st.markdown("### 🚀 Ejecutar análisis")
     
-    # Botón de análisis PRINCIPAL - debe estar fuera de cualquier condición
+    # Botón de análisis PRINCIPAL
     if st.button("🚀 Ejecutar Análisis Forrajero (Realista)", type="primary", key="analisis_principal"):
         st.session_state.analisis_ejecutado = True
+        st.session_state.mostrar_resultados = True
+        st.rerun()
     
-    # Ejecutar análisis solo cuando se presiona el botón
-    if st.session_state.get('analisis_ejecutado', False):
+    # Mostrar resultados solo si el análisis fue ejecutado
+    if st.session_state.get('analisis_ejecutado', False) and st.session_state.get('mostrar_resultados', False):
         with st.spinner("Ejecutando análisis forrajero completo..."):
             try:
                 gdf_input = st.session_state.gdf_cargado.copy()
@@ -1055,6 +1058,9 @@ if st.session_state.gdf_cargado is not None:
                         
                         st.session_state.analisis_completado = True
                         st.success("🎉 ¡Análisis completado exitosamente!")
+                        
+                        # RESETEAR el estado para evitar bucles
+                        st.session_state.analisis_ejecutado = False
                         
             except Exception as e:
                 st.error(f"❌ Error ejecutando análisis: {e}")
