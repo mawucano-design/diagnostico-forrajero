@@ -15,7 +15,6 @@ import math
 import json
 import base64
 import hashlib
-import secrets
 
 # Importaciones para mapas
 try:
@@ -69,6 +68,9 @@ def initialize_session_state():
         st.session_state.consumo_diario_ev = 10.0
     if 'eficiencia_pastoreo' not in st.session_state:
         st.session_state.eficiencia_pastoreo = 0.65
+    # Control de estado de la aplicación
+    if 'app_ready' not in st.session_state:
+        st.session_state.app_ready = False
 
 def check_authentication():
     """Verifica las credenciales de autenticación"""
@@ -97,6 +99,7 @@ def login_section():
                 if users_db[username] == hashed_password:
                     st.session_state.authenticated = True
                     st.session_state.username = username
+                    st.session_state.app_ready = True
                     st.success(f"✅ Bienvenido, {username}!")
                     st.rerun()
                 else:
@@ -110,13 +113,6 @@ def login_section():
         - **admin** / password123
         - **user** / user123  
         - **tech** / tech123
-        
-        **Características de la aplicación:**
-        - Análisis completo de biomasa forrajera
-        - Mapas interactivos con zoom automático
-        - Exportación a DOCX con informe completo
-        - Parámetros personalizables
-        - Análisis por sub-lotes
         """)
 
 # =============================================================================
@@ -179,23 +175,20 @@ def obtener_parametros_forrajeros(tipo_pastura, personalizados=None):
         return PARAMETROS_FORRAJEROS_BASE.get(tipo_pastura, PARAMETROS_FORRAJEROS_BASE['FESTUCA'])
 
 # =============================================================================
-# FUNCIONES DE CÁLCULO MEJORADAS CON PARÁMETROS GANADEROS
+# FUNCIONES DE CÁLCULO MEJORADAS
 # =============================================================================
 
 def calcular_superficie(gdf):
     """Calcula superficie en hectáreas de forma precisa"""
     try:
         if gdf.crs is None or str(gdf.crs).startswith('EPSG:4326'):
-            # Convertir a CRS proyectado para cálculo de área
-            gdf_proj = gdf.to_crs(epsg=3857)  # Web Mercator
+            gdf_proj = gdf.to_crs(epsg=3857)
             area_m2 = gdf_proj.geometry.area
         else:
             area_m2 = gdf.geometry.area
-        
-        return area_m2 / 10000.0  # Convertir a hectáreas
+        return area_m2 / 10000.0
     except Exception as e:
         st.warning(f"Advertencia en cálculo de área: {e}")
-        # Fallback simple
         return gdf.geometry.area / 10000.0
 
 def dividir_potrero_en_subLotes(gdf, n_zonas):
@@ -204,13 +197,11 @@ def dividir_potrero_en_subLotes(gdf, n_zonas):
         return gdf
     
     try:
-        # Si ya tiene múltiples polígonos, usarlos directamente
         if len(gdf) > 1:
             gdf_resultado = gdf.copy()
             gdf_resultado['id_subLote'] = range(1, len(gdf_resultado) + 1)
             return gdf_resultado
         
-        # Dividir el primer polígono
         potrero = gdf.iloc[0].geometry
         bounds = potrero.bounds
         
@@ -251,7 +242,7 @@ def dividir_potrero_en_subLotes(gdf, n_zonas):
         return gdf
 
 # =============================================================================
-# SISTEMA DE DETECCIÓN REALISTA (ORIGINAL)
+# SISTEMA DE DETECCIÓN REALISTA
 # =============================================================================
 
 class DetectorVegetacionRealista:
@@ -261,7 +252,6 @@ class DetectorVegetacionRealista:
         self.sensibilidad_suelo = sensibilidad_suelo
 
     def clasificar_vegetacion_realista(self, ndvi, evi, savi, bsi, ndbi, msavi2=None):
-        """Clasificación mejorada de vegetación con umbrales realistas"""
         if ndvi < 0.12:
             return "SUELO_DESNUDO", 0.05
         elif ndvi < 0.22:
@@ -276,7 +266,6 @@ class DetectorVegetacionRealista:
             return "VEGETACION_MUY_DENSA", 0.95
 
     def calcular_biomasa_realista(self, ndvi, evi, savi, categoria, cobertura, params):
-        """Cálculo realista de biomasa basado en múltiples índices"""
         base = params['MS_POR_HA_OPTIMO']
         
         if categoria == "SUELO_DESNUDO":
@@ -289,19 +278,14 @@ class DetectorVegetacionRealista:
             return min(base * 0.65, 3000), params['CRECIMIENTO_DIARIO'] * 0.75, 0.65
         elif categoria == "VEGETACION_DENSA":
             return min(base * 0.85, 4500), params['CRECIMIENTO_DIARIO'] * 0.9, 0.80
-        else:  # VEGETACION_MUY_DENSA
+        else:
             return min(base * 0.95, 5500), params['CRECIMIENTO_DIARIO'] * 0.95, 0.90
 
 def simular_patrones_reales_con_suelo(id_subLote, x_norm, y_norm, fuente_satelital):
-    """Simulación mejorada de patrones de vegetación realistas"""
-    # Patrón base más realista
     base = 0.25 + 0.5 * ((id_subLote % 8) / 8)
-    
-    # Variación espacial más realista
     variacion_espacial = 0.2 * (x_norm - 0.5) + 0.1 * (y_norm - 0.5)
     ndvi = max(0.08, min(0.85, base + variacion_espacial + np.random.normal(0, 0.08)))
     
-    # Cálculo de índices correlacionados de forma realista
     if ndvi < 0.15:
         evi = ndvi * 0.7 + np.random.normal(0, 0.02)
         savi = ndvi * 0.8 + np.random.normal(0, 0.02)
@@ -324,12 +308,10 @@ def simular_patrones_reales_con_suelo(id_subLote, x_norm, y_norm, fuente_satelit
         ndbi = -0.1 + np.random.normal(0, 0.02)
     
     msavi2 = ndvi * 1.05 + np.random.normal(0, 0.03)
-    
     return ndvi, evi, savi, bsi, ndbi, msavi2
 
 def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fecha_imagen, nubes_max,
                                        umbral_ndvi_minimo=0.15, umbral_ndvi_optimo=0.6, sensibilidad_suelo=0.5):
-    """Cálculo completo de índices forrajeros de forma realista"""
     try:
         resultados = []
         params = obtener_parametros_forrajeros(tipo_pastura)
@@ -361,7 +343,6 @@ def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fe
                 ndvi, evi, savi, categoria, cobertura, params
             )
             
-            # Biomasa disponible ajustada
             if categoria == "SUELO_DESNUDO":
                 biomasa_disponible = 50
             elif categoria == "SUELO_PARCIAL":
@@ -393,13 +374,10 @@ def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fe
         
     except Exception as e:
         st.error(f"❌ Error en índices: {e}")
-        import traceback
-        st.error(traceback.format_exc())
         return []
 
 def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carga_animal, 
                                eficiencia_cosecha, eficiencia_pastoreo, consumo_diario_ev):
-    """Cálculo de métricas ganaderas realistas CON PARÁMETROS GANADEROS COMPLETOS"""
     params = obtener_parametros_forrajeros(tipo_pastura)
     metricas = []
     
@@ -407,48 +385,43 @@ def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carg
         biomasa_disponible = row.get('biomasa_disponible_kg_ms_ha', 0)
         area_ha = row.get('area_ha', 0)
         
-        # Usar parámetros ganaderos personalizados o por defecto
         consumo_individual_kg = peso_promedio * params['CONSUMO_PORCENTAJE_PESO']
         biomasa_total_disponible = biomasa_disponible * area_ha * eficiencia_cosecha
         
         if biomasa_total_disponible > 0 and consumo_individual_kg > 0:
-            # EV soportable - cálculo corregido
-            ev_soportable = (biomasa_total_disponible * eficiencia_pastoreo) / (consumo_diario_ev * 30)  # Mensual
+            ev_soportable = (biomasa_total_disponible * eficiencia_pastoreo) / (consumo_diario_ev * 30)
             ev_soportable = max(0.01, ev_soportable)
         else:
             ev_soportable = 0.01
         
-        # EV por hectárea
         if ev_soportable > 0 and area_ha > 0:
             ev_ha = ev_soportable / area_ha
             ev_ha_display = ev_ha
         else:
             ev_ha_display = 0.01
         
-        # Días de permanencia - cálculo corregido
         if carga_animal > 0:
             consumo_total_diario = carga_animal * consumo_diario_ev
             if consumo_total_diario > 0 and biomasa_total_disponible > 0:
                 dias_permanencia = (biomasa_total_disponible * eficiencia_pastoreo) / consumo_total_diario
-                dias_permanencia = min(max(dias_permanencia, 0.1), 120)  # Límite realista
+                dias_permanencia = min(max(dias_permanencia, 0.1), 120)
             else:
                 dias_permanencia = 0.1
         else:
             dias_permanencia = 0.1
         
-        # Estado forrajero mejorado
         if biomasa_disponible >= 3000:
-            estado_forrajero = 5  # Excelente
+            estado_forrajero = 5
         elif biomasa_disponible >= 2000:
-            estado_forrajero = 4  # Muy bueno
+            estado_forrajero = 4
         elif biomasa_disponible >= 1200:
-            estado_forrajero = 3  # Bueno
+            estado_forrajero = 3
         elif biomasa_disponible >= 600:
-            estado_forrajero = 2  # Regular
+            estado_forrajero = 2
         elif biomasa_disponible >= 200:
-            estado_forrajero = 1  # Crítico
+            estado_forrajero = 1
         else:
-            estado_forrajero = 0  # Muy crítico
+            estado_forrajero = 0
         
         metricas.append({
             'ev_soportable': round(ev_soportable, 2),
@@ -457,25 +430,20 @@ def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carg
             'biomasa_total_kg': round(biomasa_total_disponible, 1),
             'consumo_individual_kg': round(consumo_individual_kg, 1),
             'estado_forrajero': estado_forrajero,
-            'ev_ha': round(ev_ha_display, 3),
-            'eficiencia_cosecha_usada': eficiencia_cosecha,
-            'eficiencia_pastoreo_usada': eficiencia_pastoreo,
-            'consumo_diario_ev_usado': consumo_diario_ev
+            'ev_ha': round(ev_ha_display, 3)
         })
     
     return metricas
 
 # =============================================================================
-# FUNCIONES DE MAPAS CON ZOOM AUTOMÁTICO
+# FUNCIONES DE MAPAS
 # =============================================================================
 
 def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
-    """Crea mapa interactivo con zoom automático a los polígonos"""
     if not FOLIUM_AVAILABLE or gdf is None or len(gdf) == 0:
         return None
     
     try:
-        # Calcular bounds para zoom automático
         bounds = gdf.total_bounds
         centroid = gdf.geometry.centroid.iloc[0]
         
@@ -486,7 +454,6 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
             zoom_start=12
         )
         
-        # Múltiples opciones de mapas base
         if base_map_name == "ESRI Satélite":
             folium.TileLayer(
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -501,7 +468,7 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
                 name='OpenStreetMap',
                 overlay=False
             ).add_to(m)
-        elif base_map_name == "CartoDB Positron":
+        else:
             folium.TileLayer(
                 tiles='CartoDB positron',
                 attr='CartoDB',
@@ -509,7 +476,6 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
                 overlay=False
             ).add_to(m)
         
-        # Agregar polígono con estilo
         folium.GeoJson(
             gdf.__geo_interface__,
             name='Polígono',
@@ -520,9 +486,7 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
             }
         ).add_to(m)
         
-        # Ajustar zoom a los bounds
         m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
-        
         folium.LayerControl().add_to(m)
         return m
         
@@ -531,7 +495,6 @@ def crear_mapa_interactivo(gdf, base_map_name="ESRI Satélite"):
         return None
 
 def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
-    """Mapa NDVI mejorado con zoom automático"""
     if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado) == 0:
         return None
         
@@ -546,7 +509,6 @@ def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
             zoom_start=13
         )
         
-        # Mapas base
         if base_map_name == "ESRI Satélite":
             folium.TileLayer(
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -569,23 +531,22 @@ def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
                 overlay=False
             ).add_to(m)
         
-        # Función de estilo para NDVI
         def estilo_ndvi(feature):
             ndvi = feature['properties']['ndvi']
             if ndvi < 0.2:
-                color = '#8B4513'  # Marrón - Suelo desnudo
+                color = '#8B4513'
             elif ndvi < 0.3:
-                color = '#CD853F'  # Marrón claro - Vegetación muy escasa
+                color = '#CD853F'
             elif ndvi < 0.4:
-                color = '#F4A460'  # Arena - Vegetación escasa
+                color = '#F4A460'
             elif ndvi < 0.5:
-                color = '#9ACD32'  # Amarillo verdoso - Vegetación moderada
+                color = '#9ACD32'
             elif ndvi < 0.6:
-                color = '#32CD32'  # Verde lima - Vegetación buena
+                color = '#32CD32'
             elif ndvi < 0.7:
-                color = '#228B22'  # Verde forestal - Vegetación muy buena
+                color = '#228B22'
             else:
-                color = '#006400'  # Verde oscuro - Vegetación excelente
+                color = '#006400'
                 
             return {
                 'fillColor': color,
@@ -594,7 +555,6 @@ def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
                 'fillOpacity': 0.7
             }
         
-        # Agregar datos al mapa
         folium.GeoJson(
             gdf_analizado.__geo_interface__,
             style_function=estilo_ndvi,
@@ -605,10 +565,8 @@ def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
             )
         ).add_to(m)
         
-        # Ajustar zoom
         m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
         
-        # Leyenda
         legend_html = '''
         <div style="position: fixed; bottom: 20px; left: 20px; width: 220px; 
                     background-color: white; border:2px solid grey; z-index:9999; 
@@ -624,7 +582,6 @@ def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
         </div>
         '''
         m.get_root().html.add_child(folium.Element(legend_html))
-        
         folium.LayerControl().add_to(m)
         return m
         
@@ -633,7 +590,6 @@ def crear_mapa_ndvi_mejorado(gdf_analizado, base_map_name="ESRI Satélite"):
         return None
 
 def crear_mapa_ev_ha(gdf_analizado, base_map_name="ESRI Satélite"):
-    """Mapa de EV/ha con zoom automático"""
     if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado) == 0:
         return None
         
@@ -648,7 +604,6 @@ def crear_mapa_ev_ha(gdf_analizado, base_map_name="ESRI Satélite"):
             zoom_start=13
         )
         
-        # Mapas base
         if base_map_name == "ESRI Satélite":
             folium.TileLayer(
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -674,13 +629,13 @@ def crear_mapa_ev_ha(gdf_analizado, base_map_name="ESRI Satélite"):
         def estilo_ev_ha(feature):
             ev_ha = feature['properties']['ev_ha']
             if ev_ha < 1.0:
-                color = '#FF4444'  # Rojo
+                color = '#FF4444'
             elif ev_ha < 2.0:
-                color = '#FFA726'  # Naranja
+                color = '#FFA726'
             elif ev_ha < 3.0:
-                color = '#FFD54F'  # Amarillo
+                color = '#FFD54F'
             else:
-                color = '#66BB6A'  # Verde
+                color = '#66BB6A'
                 
             return {
                 'fillColor': color,
@@ -699,7 +654,6 @@ def crear_mapa_ev_ha(gdf_analizado, base_map_name="ESRI Satélite"):
             )
         ).add_to(m)
         
-        # Ajustar zoom
         m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
         
         legend_html = '''
@@ -714,7 +668,6 @@ def crear_mapa_ev_ha(gdf_analizado, base_map_name="ESRI Satélite"):
         </div>
         '''
         m.get_root().html.add_child(folium.Element(legend_html))
-        
         folium.LayerControl().add_to(m)
         return m
         
@@ -723,11 +676,9 @@ def crear_mapa_ev_ha(gdf_analizado, base_map_name="ESRI Satélite"):
         return None
 
 def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
-    """Crea mapa detallado con matplotlib para el informe"""
     try:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
         
-        # Mapa 1: Tipos de superficie
         colores_superficie = {
             'SUELO_DESNUDO': '#8B4513',
             'SUELO_PARCIAL': '#CD853F', 
@@ -746,16 +697,14 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         
         ax1.set_title(f"Tipos de Superficie - {tipo_pastura}", fontsize=14, fontweight='bold')
         
-        # Leyenda para tipos de superficie
         patches = [mpatches.Patch(color=color, label=tipo) for tipo, color in colores_superficie.items()]
         ax1.legend(handles=patches, loc='upper right', fontsize=8)
         
-        # Mapa 2: Biomasa disponible
         cmap = LinearSegmentedColormap.from_list('biomasa_cmap', ['#FF6B6B', '#FFD54F', '#9CCC65', '#2E7D32'])
         
         for idx, row in gdf_analizado.iterrows():
             biom = row.get('biomasa_disponible_kg_ms_ha', 0)
-            val = max(0, min(1, biom/5000))  # Normalizar a 5000 kg MS/ha
+            val = max(0, min(1, biom/5000))
             color = cmap(val)
             gdf_analizado.iloc[[idx]].plot(ax=ax2, color=color, edgecolor='black', linewidth=0.5)
             c = row.geometry.centroid
@@ -763,7 +712,6 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
         
         ax2.set_title("Biomasa Disponible (kg MS/ha)", fontsize=14, fontweight='bold')
         
-        # Leyenda para biomasa
         norm = plt.Normalize(0, 5000)
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
@@ -786,7 +734,6 @@ def crear_mapa_detallado_vegetacion(gdf_analizado, tipo_pastura):
 # =============================================================================
 
 def cargar_shapefile_desde_zip(uploaded_zip):
-    """Carga shapefile desde archivo ZIP"""
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
             zip_path = os.path.join(tmp_dir, "upload.zip")
@@ -811,11 +758,10 @@ def cargar_shapefile_desde_zip(uploaded_zip):
         return None
 
 # =============================================================================
-# GENERAR INFORME DOCX (FUNCIONAL)
+# GENERAR INFORME DOCX
 # =============================================================================
 
 def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_animal, fecha_imagen):
-    """Genera y devuelve un BytesIO con el DOCX que contiene el análisis"""
     if not DOCX_AVAILABLE:
         st.error("La librería python-docx no está instalada. Ejecutá: pip install python-docx")
         return None
@@ -825,12 +771,10 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
         doc.add_heading(titulo, level=0)
         doc.add_paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         doc.add_paragraph(f"Tipo de pastura: {tipo_pastura}")
-        doc.add_paragraph(f"Fuente de datos: SENTINEL-2")
         doc.add_paragraph(f"Peso promedio animal: {peso_promedio} kg")
         doc.add_paragraph(f"Carga animal: {carga_animal} cabezas")
         doc.add_paragraph("")
 
-        # Estadísticas
         try:
             area_total = gdf['area_ha'].sum()
             biomasa_prom = float(gdf['biomasa_disponible_kg_ms_ha'].mean())
@@ -848,7 +792,6 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
         doc.add_paragraph(f"Equivalente Vaca (EV) total: {ev_total:.2f}")
         doc.add_paragraph("")
 
-        # Tabla resumen por sub-lote (primeras 20)
         doc.add_heading("Resultados por Sub-lote (primeras 20 filas)", level=1)
         columnas = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 'cobertura_vegetal',
                    'biomasa_disponible_kg_ms_ha', 'dias_permanencia', 'ev_ha']
@@ -867,7 +810,6 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
         doc.add_paragraph(f"Mostrando {min(20,len(gdf))} de {len(gdf)} sub-lotes.")
         doc.add_paragraph("")
 
-        # Inserción del mapa (si existe)
         if st.session_state.mapa_detallado_bytes is not None:
             try:
                 img_buf = st.session_state.mapa_detallado_bytes
@@ -881,7 +823,6 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
                 try:
                     doc.add_picture(tmp_path, width=Inches(6))
                 except Exception:
-                    # Si no se puede insertar a tamaño, insertar sin width
                     try:
                         doc.add_picture(tmp_path)
                     except Exception:
@@ -893,7 +834,6 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
             except Exception:
                 pass
 
-        # Conclusión breve
         doc.add_heading("Conclusión", level=1)
         if biomasa_prom <= 200:
             estado = "Muy degradado / casi sin biomasa"
@@ -907,7 +847,6 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
             estado = "Biomasa alta"
         doc.add_paragraph(f"Estado general del potrero: {estado} (Biomasa promedio: {biomasa_prom:.0f} kg MS/ha)")
 
-        # Recomendaciones técnicas
         doc.add_heading("Recomendaciones técnicas", level=1)
         if biomasa_prom < 1000:
             doc.add_paragraph("Estado: RECUPERACIÓN / CRÍTICO (biomasa baja). Recomendaciones:")
@@ -923,11 +862,9 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
             doc.add_paragraph("• Mantener la rotación con descansos de 35–60 días")
             doc.add_paragraph("• Aprovechar biomasa con pastoreos de alta densidad")
 
-        # Pie
         doc.add_paragraph("")
         doc.add_paragraph("Este informe ofrece recomendaciones generales basadas en el análisis automatizado.")
 
-        # Guardar en BytesIO
         buf = io.BytesIO()
         doc.save(buf)
         buf.seek(0)
@@ -937,13 +874,13 @@ def generar_informe_forrajero_docx(gdf, tipo_pastura, peso_promedio, carga_anima
         return None
 
 # =============================================================================
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL - FLUJO CORREGIDO
 # =============================================================================
 
 def main_application():
-    """Aplicación principal"""
+    """Aplicación principal con flujo corregido"""
     
-    # Sidebar de configuración completa
+    # Sidebar de configuración
     with st.sidebar:
         st.header(f"👋 Bienvenido, {st.session_state.username}")
         
@@ -953,6 +890,7 @@ def main_application():
             st.session_state.gdf_cargado = None
             st.session_state.gdf_analizado = None
             st.session_state.analisis_completado = False
+            st.session_state.app_ready = False
             st.rerun()
         
         st.markdown("---")
@@ -967,7 +905,6 @@ def main_application():
             )
         else:
             base_map_option = "ESRI Satélite"
-            st.warning("Folium no disponible - mapas limitados")
 
         # Fuente de datos satelitales
         st.subheader("🛰️ Fuente de Datos Satelitales")
@@ -976,7 +913,7 @@ def main_application():
             ["SENTINEL-2", "LANDSAT-8", "LANDSAT-9", "SIMULADO"],
         )
 
-        # Tipo de pastura con personalización
+        # Tipo de pastura
         st.subheader("🌿 Tipo de Pastura")
         tipo_pastura = st.selectbox(
             "Tipo de Pastura:",
@@ -992,26 +929,19 @@ def main_application():
                                                 value=0.025, step=0.001, format="%.3f")
             tasa_utilizacion = st.number_input("Tasa Utilización:", min_value=0.3, max_value=0.8, value=0.55, step=0.01,
                                               format="%.2f")
-        else:
-            # Usar parámetros por defecto
-            ms_optimo = 4000
-            crecimiento_diario = 80
-            consumo_porcentaje = 0.025
-            tasa_utilizacion = 0.55
 
-        # PARÁMETROS GANADEROS COMPLETOS
+        # Parámetros ganaderos completos
         st.subheader("🐄 Parámetros Ganaderos Completos")
         peso_promedio = st.slider("Peso promedio animal (kg):", 300, 600, 450)
         carga_animal = st.slider("Carga animal (cabezas):", 1, 1000, 100)
         
-        # Nuevos parámetros ganaderos críticos
         st.subheader("📈 Eficiencias y Consumo")
         eficiencia_cosecha = st.slider("Eficiencia de Cosecha (%):", 30, 90, 55) / 100.0
         eficiencia_pastoreo = st.slider("Eficiencia de Pastoreo (%):", 30, 90, 65) / 100.0
         consumo_diario_ev = st.number_input("Consumo Diario por EV (kg MS/día):", 
                                           min_value=5.0, max_value=20.0, value=10.0, step=0.5)
 
-        # Guardar en session state para persistencia
+        # Guardar en session state
         st.session_state.eficiencia_cosecha = eficiencia_cosecha
         st.session_state.eficiencia_pastoreo = eficiencia_pastoreo
         st.session_state.consumo_diario_ev = consumo_diario_ev
@@ -1054,14 +984,24 @@ def main_application():
             }, crs='EPSG:4326')
             
             st.session_state.gdf_cargado = gdf_ejemplo
+            st.session_state.app_ready = True
             st.success("✅ Datos de ejemplo cargados!")
             st.rerun()
 
-    # Contenido principal - MANTENER EL ESTADO DESPUÉS DEL ANÁLISIS
+    # Contenido principal - FLUJO SIMPLIFICADO
     st.title("🌱 Analizador Forrajero PRV - Versión Completa")
     st.markdown("---")
     
-    # Mostrar datos cargados si existen
+    # Procesar archivo cargado - PRIMERO
+    if uploaded_file is not None:
+        with st.spinner("Cargando shapefile..."):
+            gdf_loaded = cargar_shapefile_desde_zip(uploaded_file)
+            if gdf_loaded is not None and len(gdf_loaded) > 0:
+                st.session_state.gdf_cargado = gdf_loaded
+                st.session_state.app_ready = True
+                st.rerun()
+
+    # Mostrar datos cargados si existen - SEGUNDO
     if st.session_state.gdf_cargado is not None:
         gdf_loaded = st.session_state.gdf_cargado
         area_total = calcular_superficie(gdf_loaded).sum()
@@ -1077,7 +1017,7 @@ def main_application():
         with col4: 
             st.metric("Fuente datos", fuente_satelital)
         
-        # Vista previa del mapa con ZOOM AUTOMÁTICO
+        # Vista previa del mapa
         if FOLIUM_AVAILABLE:
             st.markdown("---")
             st.markdown("### 🗺️ Vista Previa del Potrero")
@@ -1085,15 +1025,7 @@ def main_application():
             if m:
                 st_folium(m, width=1200, height=500)
 
-    # Procesar archivo cargado NUEVO
-    if uploaded_file is not None:
-        with st.spinner("Cargando shapefile..."):
-            gdf_loaded = cargar_shapefile_desde_zip(uploaded_file)
-            if gdf_loaded is not None and len(gdf_loaded) > 0:
-                st.session_state.gdf_cargado = gdf_loaded
-                st.rerun()
-
-    # Ejecutar análisis - SOLO SI HAY DATOS CARGADOS
+    # Ejecutar análisis - TERCERO
     st.markdown("---")
     st.markdown("### 🚀 Ejecutar Análisis Forrajero")
     
@@ -1123,7 +1055,7 @@ def main_application():
                                 if k != 'id_subLote':
                                     gdf_sub.loc[gdf_sub['id_subLote'] == rec['id_subLote'], k] = v
                         
-                        # 5. Calcular métricas ganaderas CON PARÁMETROS COMPLETOS
+                        # 5. Calcular métricas ganaderas
                         metricas = calcular_metricas_ganaderas(
                             gdf_sub, tipo_pastura, peso_promedio, carga_animal,
                             st.session_state.eficiencia_cosecha,
@@ -1167,7 +1099,7 @@ def main_application():
                         except Exception as e:
                             st.error(f"Error exportando CSV: {e}")
                         
-                        # 8. Generar informe DOCX con descarga automática
+                        # 8. Generar informe DOCX
                         if DOCX_AVAILABLE:
                             docx_buf = generar_informe_forrajero_docx(gdf_sub, tipo_pastura, peso_promedio, carga_animal, fecha_imagen)
                             if docx_buf is not None:
@@ -1186,15 +1118,10 @@ def main_application():
                                 </body>
                                 </html>
                                 """
-                                st.success("✅ Informe DOCX generado. Descarga automática iniciada (o hacé clic en el enlace).")
+                                st.success("✅ Informe DOCX generado. Descarga automática iniciada.")
                                 st.components.v1.html(html_download, height=140)
-                            else:
-                                st.error("❌ No se pudo generar el informe DOCX.")
-                        else:
-                            st.warning("python-docx no está instalado — no puedo generar DOCX. Ejecutá: pip install python-docx")
                         
                         # 9. Mostrar resultados completos
-                        st.session_state.analisis_completado = True
                         mostrar_resultados_completos(gdf_sub, base_map_option)
                         
                     else:
@@ -1202,31 +1129,27 @@ def main_application():
                         
                 except Exception as e:
                     st.error(f"❌ Error en el análisis: {e}")
-                    import traceback
-                    st.error(traceback.format_exc())
     
     # Mostrar resultados si ya se completó el análisis
     elif st.session_state.analisis_completado and st.session_state.gdf_analizado is not None:
         mostrar_resultados_completos(st.session_state.gdf_analizado, base_map_option)
     
-    else:
-        # Pantalla de bienvenida
+    # Pantalla de bienvenida si no hay datos
+    elif st.session_state.gdf_cargado is None:
         st.info("""
         ### 🌱 Bienvenido al Analizador Forrajero PRV Completo
-        
-        **Características principales:**
-        - ✅ Sistema de autenticación seguro
-        - ✅ Análisis realista de biomasa forrajera
-        - ✅ Mapas interactivos con ZOOM AUTOMÁTICO
-        - ✅ Parámetros ganaderos completos (eficiencia de cosecha, eficiencia de pastoreo, consumo diario)
-        - ✅ Exportación a DOCX funcional con descarga automática
-        - ✅ Análisis espacial detallado por sub-lotes
         
         **Para comenzar:**
         1. **Configura** los parámetros en la barra lateral
         2. **Carga** tu shapefile en formato ZIP o usa datos de ejemplo
         3. **Ejecuta** el análisis completo
         4. **Explora** los resultados en mapas interactivos
+        
+        **Características:**
+        - Análisis realista de biomasa forrajera
+        - Mapas interactivos con zoom automático
+        - Parámetros ganaderos completos
+        - Exportación a DOCX con descarga automática
         """)
 
 def mostrar_resultados_completos(gdf_analizado, base_map_option):
@@ -1253,7 +1176,7 @@ def mostrar_resultados_completos(gdf_analizado, base_map_option):
         dias_prom = gdf_analizado['dias_permanencia'].mean()
         st.metric("Días de Permanencia Promedio", f"{dias_prom:.1f}")
     
-    # Mostrar parámetros ganaderos usados
+    # Parámetros ganaderos usados
     st.subheader("⚙️ Parámetros Ganaderos Aplicados")
     col_param1, col_param2, col_param3 = st.columns(3)
     with col_param1:
@@ -1263,9 +1186,9 @@ def mostrar_resultados_completos(gdf_analizado, base_map_option):
     with col_param3:
         st.metric("Consumo Diario por EV", f"{st.session_state.consumo_diario_ev} kg MS/día")
     
-    # MAPAS INTERACTIVOS CON ZOOM AUTOMÁTICO Y PESTAÑAS
+    # Mapas interactivos
     if FOLIUM_AVAILABLE:
-        st.header("🗺️ MAPAS INTERACTIVOS CON ZOOM AUTOMÁTICO")
+        st.header("🗺️ MAPAS INTERACTIVOS")
         
         tab1, tab2, tab3 = st.tabs(["🌿 NDVI - Estado Vegetativo", "🐄 EV/ha - Capacidad de Carga", "🗺️ Mapa Detallado"])
         
@@ -1274,23 +1197,17 @@ def mostrar_resultados_completos(gdf_analizado, base_map_option):
             mapa_ndvi = crear_mapa_ndvi_mejorado(gdf_analizado, base_map_option)
             if mapa_ndvi:
                 st_folium(mapa_ndvi, width=1200, height=600)
-            else:
-                st.error("❌ No se pudo generar el mapa de NDVI")
         
         with tab2:
             st.subheader("EV/ha - Capacidad de Carga")
             mapa_ev = crear_mapa_ev_ha(gdf_analizado, base_map_option)
             if mapa_ev:
                 st_folium(mapa_ev, width=1200, height=600)
-            else:
-                st.error("❌ No se pudo generar el mapa de EV/ha")
         
         with tab3:
             st.subheader("Mapa Detallado de Análisis")
             if st.session_state.mapa_detallado_bytes is not None:
                 st.image(st.session_state.mapa_detallado_bytes, use_column_width=True)
-            else:
-                st.info("El mapa detallado se genera automáticamente para el informe")
     
     # Tabla de resultados
     st.header("📋 DETALLE POR SUB-LOTE")
