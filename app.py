@@ -64,20 +64,17 @@ def initialize_session_state():
         st.session_state.sh_client_secret = None
     if 'sh_configured' not in st.session_state:
         st.session_state.sh_configured = False
-    # Nuevos estados para parámetros personalizados
     if 'parametros_personalizados' not in st.session_state:
         st.session_state.parametros_personalizados = {}
 
 # Sistema de autenticación simple
 def check_authentication():
     """Verifica las credenciales de autenticación"""
-    # Credenciales por defecto (en producción usar variables de entorno)
     default_users = {
         "admin": hashlib.sha256("password123".encode()).hexdigest(),
         "user": hashlib.sha256("user123".encode()).hexdigest(),
         "tech": hashlib.sha256("tech123".encode()).hexdigest()
     }
-    
     return default_users
 
 def login_section():
@@ -105,30 +102,25 @@ def login_section():
             else:
                 st.error("❌ Usuario no encontrado")
     
-    # Información de usuarios demo
     with st.expander("ℹ️ Información de acceso demo"):
         st.markdown("""
         **Usuarios de prueba:**
         - **admin** / password123
         - **user** / user123  
         - **tech** / tech123
-        
-        *En producción, configurar variables de entorno para credenciales reales*
         """)
 
 # =============================================================================
-# CONFIGURACIÓN SENTINEL HUB - MEJORADA
+# CONFIGURACIÓN SENTINEL HUB
 # =============================================================================
 
 class SentinelHubConfig:
     def __init__(self):
-        self.base_url = "https://services.sentinel-hub.com/ogc/wms/"
         self.available = False
         self.config_message = ""
         
     def check_configuration(self):
         try:
-            # 1. PRIMERO: Verificar Secrets de Streamlit Cloud
             if all(key in st.secrets for key in ['SENTINEL_HUB_CLIENT_ID', 'SENTINEL_HUB_CLIENT_SECRET']):
                 st.session_state.sh_client_id = st.secrets['SENTINEL_HUB_CLIENT_ID']
                 st.session_state.sh_client_secret = st.secrets['SENTINEL_HUB_CLIENT_SECRET']
@@ -136,8 +128,6 @@ class SentinelHubConfig:
                 self.available = True
                 self.config_message = "✅ Sentinel Hub configurado (Streamlit Secrets)"
                 return True
-            
-            # 2. SEGUNDO: Verificar variables de entorno
             elif all(os.getenv(key) for key in ['SENTINEL_HUB_CLIENT_ID', 'SENTINEL_HUB_CLIENT_SECRET']):
                 st.session_state.sh_client_id = os.getenv('SENTINEL_HUB_CLIENT_ID')
                 st.session_state.sh_client_secret = os.getenv('SENTINEL_HUB_CLIENT_SECRET')
@@ -145,34 +135,24 @@ class SentinelHubConfig:
                 self.available = True
                 self.config_message = "✅ Sentinel Hub configurado (Variables Entorno)"
                 return True
-            
-            # 3. TERCERO: Verificar session state (configuración manual previa)
-            elif ('sh_client_id' in st.session_state and 
-                  'sh_client_secret' in st.session_state and
-                  st.session_state.sh_client_id and 
-                  st.session_state.sh_client_secret):
-                
+            elif ('sh_client_id' in st.session_state and 'sh_client_secret' in st.session_state and
+                  st.session_state.sh_client_id and st.session_state.sh_client_secret):
                 st.session_state.sh_configured = True
                 self.available = True
                 self.config_message = "✅ Sentinel Hub configurado (Manual)"
                 return True
-            
-            # 4. FALLBACK: Modo simulado para desarrollo
             else:
                 self.available = False
                 self.config_message = "❌ Sentinel Hub no configurado - Usando modo simulado"
                 return False
-                
         except Exception as e:
             self.available = False
             self.config_message = f"❌ Error: {str(e)}"
             return False
 
     def get_credentials_status(self):
-        """Devuelve el estado de las credenciales para mostrar en la UI"""
         if self.available:
             client_id = st.session_state.get('sh_client_id', '')
-            # Mostrar solo los primeros y últimos caracteres por seguridad
             if client_id and len(client_id) > 12:
                 masked_id = f"{client_id[:8]}...{client_id[-4:]}"
             else:
@@ -182,49 +162,37 @@ class SentinelHubConfig:
             return "🔴 No configurado - Modo simulado"
 
 class SentinelHubProcessor:
-    """Procesa datos reales de Sentinel Hub con manejo de errores"""
-    
     def __init__(self):
-        self.base_url = "https://services.sentinel-hub.com/ogc/wms/"
         self.sh_config = SentinelHubConfig()
         
     def get_ndvi_for_geometry(self, geometry, fecha, bbox, width=512, height=512):
-        """Obtiene NDVI real desde Sentinel Hub o simula datos"""
         try:
             if not self.sh_config.available:
                 return self._simular_ndvi_response(geometry)
-                
-            # Aquí iría el código real para conectar con Sentinel Hub
-            # Por ahora simulamos la respuesta
             return self._simular_ndvi_response(geometry)
-            
         except Exception as e:
             st.error(f"Error obteniendo NDVI de Sentinel Hub: {e}")
             return self._simular_ndvi_response(geometry)
     
     def _simular_ndvi_response(self, geometry):
-        """Simula respuesta de Sentinel Hub (para desarrollo)"""
         try:
-            # Simular NDVI basado en la posición de la geometría
             centroid = geometry.centroid
             x_norm = (centroid.x * 100) % 1
             y_norm = (centroid.y * 100) % 1
             
-            # Crear patrones realistas
             if x_norm < 0.2 or y_norm < 0.2:
-                ndvi = 0.15 + np.random.normal(0, 0.05)  # Bordes - suelo
+                ndvi = 0.15 + np.random.normal(0, 0.05)
             elif x_norm > 0.7 and y_norm > 0.7:
-                ndvi = 0.75 + np.random.normal(0, 0.03)  # Esquina - vegetación densa
+                ndvi = 0.75 + np.random.normal(0, 0.03)
             else:
-                ndvi = 0.45 + np.random.normal(0, 0.04)  # Centro - vegetación media
+                ndvi = 0.45 + np.random.normal(0, 0.04)
             
             return max(0.1, min(0.85, ndvi))
-            
         except:
-            return 0.5  # Valor por defecto
+            return 0.5
 
 # =============================================================================
-# PARÁMETROS FORRAJEROS UNIFICADOS - AJUSTADOS Y MÁS REALISTAS
+# PARÁMETROS FORRAJEROS UNIFICADOS
 # =============================================================================
 
 PARAMETROS_FORRAJEROS = {
@@ -321,9 +289,7 @@ PARAMETROS_FORRAJEROS = {
 }
 
 def obtener_parametros(tipo_pastura, parametros_personalizados=None):
-    """Obtiene parámetros con soporte para personalización"""
     if tipo_pastura == "PERSONALIZADO" and parametros_personalizados:
-        # Combinar parámetros base con personalizados
         base = PARAMETROS_FORRAJEROS['PERSONALIZADO'].copy()
         base.update(parametros_personalizados)
         return base
@@ -331,50 +297,41 @@ def obtener_parametros(tipo_pastura, parametros_personalizados=None):
         return PARAMETROS_FORRAJEROS.get(tipo_pastura, PARAMETROS_FORRAJEROS['FESTUCA'])
 
 # =============================================================================
-# FUNCIONES DE CÁLCULO UNIFICADAS - MEJORADAS Y MÁS REALISTAS
+# FUNCIONES DE CÁLCULO
 # =============================================================================
 
 def calcular_ev_ha(biomasa_disponible_kg_ms_ha, consumo_diario_ev, eficiencia_pastoreo=0.7):
-    """Calcula EV/ha con parámetros más realistas"""
     if consumo_diario_ev <= 0:
         return 0
-    # Cálculo más preciso considerando eficiencia de pastoreo
     ev_ha = (biomasa_disponible_kg_ms_ha * eficiencia_pastoreo) / consumo_diario_ev
     return max(0, round(ev_ha, 2))
 
 def calcular_carga_animal_total(ev_ha, area_ha):
-    """Calcula carga animal total"""
     return round(ev_ha * area_ha, 1)
 
 def calcular_dias_permanencia(biomasa_total_kg, consumo_total_diario, crecimiento_diario_kg=0):
-    """Calcula días de permanencia con crecimiento considerado"""
     if consumo_total_diario <= 0:
         return 0
     
-    # Cálculo base
     dias_base = biomasa_total_kg / consumo_total_diario
     
     if crecimiento_diario_kg > 0:
-        # Ajustar por crecimiento durante el pastoreo (modelo más realista)
-        factor_crecimiento = 0.25  # Factor conservador
+        factor_crecimiento = 0.25
         crecimiento_efectivo = crecimiento_diario_kg * factor_crecimiento * dias_base
         dias_ajustados = (biomasa_total_kg + crecimiento_efectivo) / consumo_total_diario
-        return min(round(dias_ajustados, 1), 120)  # Máximo 120 días
+        return min(round(dias_ajustados, 1), 120)
     
     return min(round(dias_base, 1), 120)
 
 def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura, parametros_personalizados=None):
-    """Calcula la disponibilidad forrajera con métricas mejoradas y más realistas"""
     params = obtener_parametros(tipo_pastura, parametros_personalizados)
     
-    # Cálculos mejorados de disponibilidad considerando eficiencia de cosecha
     gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] = (
         gdf_analizado['biomasa_disponible_kg_ms_ha'] * 
         params['EFICIENCIA_PASTOREO'] * 
         params['EFICIENCIA_COSECHA']
     ).round(0)
     
-    # Clasificación de disponibilidad MÁS REALISTA
     condiciones = [
         gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 800,
         gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] < 2000,
@@ -384,488 +341,502 @@ def calcular_disponibilidad_forrajera(gdf_analizado, tipo_pastura, parametros_pe
     categorias = ['MUY BAJA', 'BAJA', 'MEDIA', 'ALTA']
     gdf_analizado['categoria_disponibilidad'] = np.select(condiciones, categorias, default='MEDIA')
     
-    # Cálculo de días de autonomía más realista
-    consumo_promedio_diario = 25  # kg MS/día/EV (valor más realista)
+    consumo_promedio_diario = 25
     gdf_analizado['dias_autonomia'] = (gdf_analizado['disponibilidad_forrajera_kg_ms_ha'] / consumo_promedio_diario).round(1)
     
     return gdf_analizado
 
 # =============================================================================
-# FUNCIONES DE MAPAS UNIFICADAS - LEYENDAS CLARAS Y VISIBLES
+# FUNCIONES DE MAPAS - CORREGIDAS
 # =============================================================================
 
 def crear_mapa_base(gdf, mapa_seleccionado="ESRI World Imagery", zoom_start=10):
-    """Crea el mapa base con controles"""
-    if not FOLIUM_AVAILABLE or gdf is None:
+    """Crea el mapa base con controles - FUNCIÓN CORREGIDA"""
+    if not FOLIUM_AVAILABLE or gdf is None or len(gdf) == 0:
+        st.warning("No se puede crear el mapa: datos no disponibles")
         return None
         
-    bounds = gdf.total_bounds
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-    
-    m = folium.Map(
-        location=[center_lat, center_lon],
-        zoom_start=zoom_start,
-        tiles=None,
-        control_scale=True
-    )
-    
-    # Capas base
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri, Maxar, Earthstar Geographics",
-        name="🌍 Satélite",
-        control=True,
-        show=(mapa_seleccionado == "ESRI World Imagery")
-    ).add_to(m)
-    
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri, HERE, Garmin",
-        name="🗺️ Calles",
-        control=True,
-        show=(mapa_seleccionado == "ESRI World Street Map")
-    ).add_to(m)
-    
-    folium.TileLayer(
-        tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attr="OpenStreetMap contributors",
-        name="🗾 OpenStreetMap",
-        control=True,
-        show=(mapa_seleccionado == "OpenStreetMap")
-    ).add_to(m)
-    
-    # Control de capas
-    folium.LayerControl().add_to(m)
-    
-    return m
+    try:
+        # Calcular centro y límites
+        bounds = gdf.total_bounds
+        if len(bounds) == 0:
+            return None
+            
+        center_lat = (bounds[1] + bounds[3]) / 2
+        center_lon = (bounds[0] + bounds[2]) / 2
+        
+        # Crear mapa base
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=zoom_start,
+            tiles=None,
+            control_scale=True
+        )
+        
+        # Capas base
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri, Maxar, Earthstar Geographics",
+            name="🌍 Satélite",
+            control=True,
+            show=(mapa_seleccionado == "ESRI World Imagery")
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri, HERE, Garmin",
+            name="🗺️ Calles",
+            control=True,
+            show=(mapa_seleccionado == "ESRI World Street Map")
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            attr="OpenStreetMap contributors",
+            name="🗾 OpenStreetMap",
+            control=True,
+            show=(mapa_seleccionado == "OpenStreetMap")
+        ).add_to(m)
+        
+        # Control de capas
+        folium.LayerControl().add_to(m)
+        
+        return m
+        
+    except Exception as e:
+        st.error(f"Error creando mapa base: {e}")
+        return None
 
 def crear_mapa_ndvi(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de NDVI con leyenda CLARA y visible"""
-    if not FOLIUM_AVAILABLE:
+    """Crea mapa interactivo de NDVI con leyenda CLARA"""
+    if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado) == 0:
+        st.warning("No se pueden generar mapas: Folium no disponible o datos vacíos")
         return None
         
-    m = crear_mapa_base(gdf_analizado, mapa_base)
-    
-    def estilo_ndvi(feature):
-        ndvi = feature['properties']['ndvi']
-        if ndvi < 0.1:
-            color = '#8B4513'  # Marrón - suelo desnudo
-        elif ndvi < 0.2:
-            color = '#CD853F'  # Marrón claro - suelo con algo de vegetación
-        elif ndvi < 0.3:
-            color = '#FFD700'  # Amarillo - vegetación muy escasa
-        elif ndvi < 0.4:
-            color = '#ADFF2F'  # Verde amarillento - vegetación escasa
-        elif ndvi < 0.5:
-            color = '#32CD32'  # Verde claro - vegetación moderada
-        elif ndvi < 0.6:
-            color = '#228B22'  # Verde - vegetación buena
-        elif ndvi < 0.7:
-            color = '#006400'  # Verde oscuro - vegetación muy buena
-        else:
-            color = '#004d00'  # Verde muy oscuro - vegetación excelente
+    try:
+        m = crear_mapa_base(gdf_analizado, mapa_base)
+        if m is None:
+            return None
+        
+        # Verificar que tenemos la columna ndvi
+        if 'ndvi' not in gdf_analizado.columns:
+            st.error("No se encuentra la columna 'ndvi' en los datos analizados")
+            return m
             
-        return {
-            'fillColor': color,
-            'color': 'black',
-            'weight': 1,
-            'fillOpacity': 0.7
-        }
-    
-    folium.GeoJson(
-        gdf_analizado.__geo_interface__,
-        style_function=estilo_ndvi,
-        tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'ndvi', 'tipo_superficie', 'biomasa_disponible_kg_ms_ha'],
-            aliases=['Sub-Lote:', 'NDVI:', 'Tipo:', 'Biomasa (kg MS/ha):'],
-            localize=True,
-            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
-        )
-    ).add_to(m)
-    
-    # LEYENDA CLARA Y VISIBLE para NDVI
-    legend_html = '''
-    <div style="
-        position: fixed; 
-        bottom: 20px; 
-        left: 20px; 
-        width: 280px; 
-        height: auto;
-        background-color: white; 
-        border: 3px solid #2E8B57;
-        z-index: 9999; 
-        font-size: 12px; 
-        padding: 12px;
-        border-radius: 8px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.4);
-        font-family: Arial, sans-serif;
-    ">
+        def estilo_ndvi(feature):
+            if 'ndvi' not in feature['properties']:
+                return {'fillColor': 'gray', 'color': 'black', 'weight': 1, 'fillOpacity': 0.5}
+                
+            ndvi = feature['properties']['ndvi']
+            if ndvi < 0.1:
+                color = '#8B4513'
+            elif ndvi < 0.2:
+                color = '#CD853F'
+            elif ndvi < 0.3:
+                color = '#FFD700'
+            elif ndvi < 0.4:
+                color = '#ADFF2F'
+            elif ndvi < 0.5:
+                color = '#32CD32'
+            elif ndvi < 0.6:
+                color = '#228B22'
+            elif ndvi < 0.7:
+                color = '#006400'
+            else:
+                color = '#004d00'
+                
+            return {
+                'fillColor': color,
+                'color': 'black',
+                'weight': 1,
+                'fillOpacity': 0.7
+            }
+        
+        # Crear GeoJSON con los datos
+        geojson_data = gdf_analizado.__geo_interface__
+        
+        folium.GeoJson(
+            geojson_data,
+            style_function=estilo_ndvi,
+            tooltip=folium.GeoJsonTooltip(
+                fields=['id_subLote', 'ndvi', 'tipo_superficie', 'biomasa_disponible_kg_ms_ha'],
+                aliases=['Sub-Lote:', 'NDVI:', 'Tipo:', 'Biomasa (kg MS/ha):'],
+                localize=True
+            )
+        ).add_to(m)
+        
+        # LEYENDA MEJORADA
+        legend_html = '''
         <div style="
-            font-weight: bold; 
-            margin-bottom: 12px; 
-            text-align: center; 
-            font-size: 14px; 
-            color: #2E8B57;
-            background-color: #f0fff0;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #2E8B57;
+            position: fixed; 
+            bottom: 20px; 
+            left: 20px; 
+            width: 280px; 
+            background-color: white; 
+            border: 3px solid #2E8B57;
+            z-index: 9999; 
+            font-size: 12px; 
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            font-family: Arial, sans-serif;
         ">
-            🌿 ÍNDICE NDVI - ESTADO VEGETATIVO
+            <div style="font-weight: bold; margin-bottom: 12px; text-align: center; font-size: 14px; color: #2E8B57;">
+                🌿 ÍNDICE NDVI
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #8B4513; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">&lt; 0.1</span> - Suelo
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #CD853F; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.1-0.2</span> - Muy escasa
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #FFD700; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.2-0.3</span> - Escasa
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #ADFF2F; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.3-0.4</span> - Regular
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #32CD32; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.4-0.5</span> - Buena
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #228B22; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.5-0.6</span> - Muy Buena
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #006400; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.6-0.7</span> - Excelente
+            </div>
+            <div style="display: flex; align-items: center;">
+                <div style="width: 20px; height: 15px; background: #004d00; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">&gt; 0.7</span> - Óptima
+            </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #8B4513; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">&lt; 0.1</span> - Suelo desnudo
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #CD853F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.1-0.2</span> - Muy escasa
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #FFD700; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.2-0.3</span> - Escasa
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #ADFF2F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.3-0.4</span> - Regular
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #32CD32; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.4-0.5</span> - Buena
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #228B22; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.5-0.6</span> - Muy Buena
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #006400; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.6-0.7</span> - Excelente
-        </div>
-        <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background: #004d00; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">&gt; 0.7</span> - Óptima
-        </div>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
-    return m
+        '''
+        m.get_root().html.add_child(folium.Element(legend_html))
+        
+        return m
+        
+    except Exception as e:
+        st.error(f"Error creando mapa NDVI: {e}")
+        return None
 
 def crear_mapa_ev_ha(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de EV/ha con leyenda CLARA y visible"""
-    if not FOLIUM_AVAILABLE:
+    """Crea mapa interactivo de EV/ha con leyenda CLARA"""
+    if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado) == 0:
         return None
         
-    m = crear_mapa_base(gdf_analizado, mapa_base)
-    
-    def estilo_ev_ha(feature):
-        ev_ha = feature['properties']['ev_ha']
-        if ev_ha < 0.3:
-            color = '#FF4444'  # Rojo - muy baja
-        elif ev_ha < 0.8:
-            color = '#FF6B6B'  # Rojo claro - baja
-        elif ev_ha < 1.5:
-            color = '#FFA726'  # Naranja - moderada baja
-        elif ev_ha < 2.5:
-            color = '#FFD54F'  # Amarillo - moderada
-        elif ev_ha < 3.5:
-            color = '#9CCC65'  # Verde claro - buena
-        elif ev_ha < 5.0:
-            color = '#66BB6A'  # Verde - muy buena
-        else:
-            color = '#2E7D32'  # Verde oscuro - excelente
+    try:
+        m = crear_mapa_base(gdf_analizado, mapa_base)
+        if m is None:
+            return None
             
-        return {
-            'fillColor': color,
-            'color': 'black',
-            'weight': 1,
-            'fillOpacity': 0.7
-        }
-    
-    folium.GeoJson(
-        gdf_analizado.__geo_interface__,
-        style_function=estilo_ev_ha,
-        tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha', 'dias_permanencia'],
-            aliases=['Sub-Lote:', 'EV/ha:', 'Biomasa (kg MS/ha):', 'Días Permanencia:'],
-            localize=True,
-            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
-        )
-    ).add_to(m)
-    
-    # LEYENDA CLARA Y VISIBLE para EV/ha
-    legend_html = '''
-    <div style="
-        position: fixed; 
-        bottom: 20px; 
-        left: 20px; 
-        width: 260px; 
-        height: auto;
-        background-color: white; 
-        border: 3px solid #2E8B57;
-        z-index: 9999; 
-        font-size: 12px; 
-        padding: 12px;
-        border-radius: 8px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.4);
-        font-family: Arial, sans-serif;
-    ">
+        if 'ev_ha' not in gdf_analizado.columns:
+            st.error("No se encuentra la columna 'ev_ha' en los datos analizados")
+            return m
+            
+        def estilo_ev_ha(feature):
+            if 'ev_ha' not in feature['properties']:
+                return {'fillColor': 'gray', 'color': 'black', 'weight': 1, 'fillOpacity': 0.5}
+                
+            ev_ha = feature['properties']['ev_ha']
+            if ev_ha < 0.3:
+                color = '#FF4444'
+            elif ev_ha < 0.8:
+                color = '#FF6B6B'
+            elif ev_ha < 1.5:
+                color = '#FFA726'
+            elif ev_ha < 2.5:
+                color = '#FFD54F'
+            elif ev_ha < 3.5:
+                color = '#9CCC65'
+            elif ev_ha < 5.0:
+                color = '#66BB6A'
+            else:
+                color = '#2E7D32'
+                
+            return {
+                'fillColor': color,
+                'color': 'black',
+                'weight': 1,
+                'fillOpacity': 0.7
+            }
+        
+        folium.GeoJson(
+            gdf_analizado.__geo_interface__,
+            style_function=estilo_ev_ha,
+            tooltip=folium.GeoJsonTooltip(
+                fields=['id_subLote', 'ev_ha', 'biomasa_disponible_kg_ms_ha', 'dias_permanencia'],
+                aliases=['Sub-Lote:', 'EV/ha:', 'Biomasa (kg MS/ha):', 'Días Permanencia:'],
+                localize=True
+            )
+        ).add_to(m)
+        
+        # LEYENDA MEJORADA
+        legend_html = '''
         <div style="
-            font-weight: bold; 
-            margin-bottom: 12px; 
-            text-align: center; 
-            font-size: 14px; 
-            color: #2E8B57;
-            background-color: #f0fff0;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #2E8B57;
+            position: fixed; 
+            bottom: 20px; 
+            left: 20px; 
+            width: 260px; 
+            background-color: white; 
+            border: 3px solid #2E8B57;
+            z-index: 9999; 
+            font-size: 12px; 
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
         ">
-            🐄 CAPACIDAD DE CARGA (EV/ha)
+            <div style="font-weight: bold; margin-bottom: 12px; text-align: center; font-size: 14px; color: #2E8B57;">
+                🐄 CAPACIDAD DE CARGA (EV/ha)
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #FF4444; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">&lt; 0.3</span> - Muy Baja
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #FF6B6B; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.3-0.8</span> - Baja
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #FFA726; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">0.8-1.5</span> - Moderada Baja
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #FFD54F; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">1.5-2.5</span> - Moderada
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #9CCC65; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">2.5-3.5</span> - Buena
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                <div style="width: 20px; height: 15px; background: #66BB6A; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">3.5-5.0</span> - Muy Buena
+            </div>
+            <div style="display: flex; align-items: center;">
+                <div style="width: 20px; height: 15px; background: #2E7D32; border: 2px solid #000; margin-right: 8px;"></div>
+                <span style="font-weight: bold;">&gt; 5.0</span> - Excelente
+            </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #FF4444; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">&lt; 0.3</span> - Muy Baja
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #FF6B6B; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.3-0.8</span> - Baja
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #FFA726; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">0.8-1.5</span> - Moderada Baja
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #FFD54F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">1.5-2.5</span> - Moderada
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #9CCC65; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">2.5-3.5</span> - Buena
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 6px;">
-            <div style="width: 20px; height: 15px; background: #66BB6A; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">3.5-5.0</span> - Muy Buena
-        </div>
-        <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background: #2E7D32; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <span style="font-weight: bold;">&gt; 5.0</span> - Excelente
-        </div>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
-    return m
+        '''
+        m.get_root().html.add_child(folium.Element(legend_html))
+        
+        return m
+        
+    except Exception as e:
+        st.error(f"Error creando mapa EV/ha: {e}")
+        return None
 
 def crear_mapa_disponibilidad(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo de disponibilidad forrajera con leyenda CLARA y visible"""
-    if not FOLIUM_AVAILABLE:
+    """Crea mapa interactivo de disponibilidad forrajera con leyenda CLARA"""
+    if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado) == 0:
         return None
         
-    m = crear_mapa_base(gdf_analizado, mapa_base)
-    
-    def estilo_disponibilidad(feature):
-        categoria = feature['properties']['categoria_disponibilidad']
-        if categoria == 'MUY BAJA':
-            color = '#D32F2F'  # Rojo oscuro
-        elif categoria == 'BAJA':
-            color = '#FF5252'  # Rojo
-        elif categoria == 'MEDIA':
-            color = '#FFEB3B'  # Amarillo
-        else:
-            color = '#4CAF50'  # Verde
+    try:
+        m = crear_mapa_base(gdf_analizado, mapa_base)
+        if m is None:
+            return None
             
-        return {
-            'fillColor': color,
-            'color': 'black',
-            'weight': 1,
-            'fillOpacity': 0.7
-        }
-    
-    folium.GeoJson(
-        gdf_analizado.__geo_interface__,
-        style_function=estilo_disponibilidad,
-        tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
-            aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad (kg MS/ha):', 'Días Autonomía:'],
-            localize=True,
-            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
-        )
-    ).add_to(m)
-    
-    # LEYENDA CLARA Y VISIBLE para Disponibilidad
-    legend_html = '''
-    <div style="
-        position: fixed; 
-        bottom: 20px; 
-        left: 20px; 
-        width: 300px; 
-        height: auto;
-        background-color: white; 
-        border: 3px solid #2E8B57;
-        z-index: 9999; 
-        font-size: 12px; 
-        padding: 12px;
-        border-radius: 8px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.4);
-        font-family: Arial, sans-serif;
-    ">
+        if 'categoria_disponibilidad' not in gdf_analizado.columns:
+            st.error("No se encuentra la columna 'categoria_disponibilidad' en los datos analizados")
+            return m
+            
+        def estilo_disponibilidad(feature):
+            if 'categoria_disponibilidad' not in feature['properties']:
+                return {'fillColor': 'gray', 'color': 'black', 'weight': 1, 'fillOpacity': 0.5}
+                
+            categoria = feature['properties']['categoria_disponibilidad']
+            if categoria == 'MUY BAJA':
+                color = '#D32F2F'
+            elif categoria == 'BAJA':
+                color = '#FF5252'
+            elif categoria == 'MEDIA':
+                color = '#FFEB3B'
+            else:
+                color = '#4CAF50'
+                
+            return {
+                'fillColor': color,
+                'color': 'black',
+                'weight': 1,
+                'fillOpacity': 0.7
+            }
+        
+        folium.GeoJson(
+            gdf_analizado.__geo_interface__,
+            style_function=estilo_disponibilidad,
+            tooltip=folium.GeoJsonTooltip(
+                fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
+                aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad (kg MS/ha):', 'Días Autonomía:'],
+                localize=True
+            )
+        ).add_to(m)
+        
+        # LEYENDA MEJORADA
+        legend_html = '''
         <div style="
-            font-weight: bold; 
-            margin-bottom: 12px; 
-            text-align: center; 
-            font-size: 14px; 
-            color: #2E8B57;
-            background-color: #f0fff0;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #2E8B57;
+            position: fixed; 
+            bottom: 20px; 
+            left: 20px; 
+            width: 300px; 
+            background-color: white; 
+            border: 3px solid #2E8B57;
+            z-index: 9999; 
+            font-size: 12px; 
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
         ">
-            📊 DISPONIBILIDAD FORRAJERA
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #ffebee; border-radius: 4px;">
-            <div style="width: 20px; height: 15px; background: #D32F2F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #D32F2F;">🔴 MUY BAJA</span><br>
-                <span style="font-size: 11px;">&lt; 800 kg MS/ha</span>
+            <div style="font-weight: bold; margin-bottom: 12px; text-align: center; font-size: 14px; color: #2E8B57;">
+                📊 DISPONIBILIDAD FORRAJERA
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #ffebee; border-radius: 4px;">
+                <div style="width: 20px; height: 15px; background: #D32F2F; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #D32F2F;">🔴 MUY BAJA</span><br>
+                    <span style="font-size: 11px;">&lt; 800 kg MS/ha</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #fff3e0; border-radius: 4px;">
+                <div style="width: 20px; height: 15px; background: #FF5252; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #FF9800;">🟠 BAJA</span><br>
+                    <span style="font-size: 11px;">800-2000 kg MS/ha</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #fffde7; border-radius: 4px;">
+                <div style="width: 20px; height: 15px; background: #FFEB3B; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #FFC107;">🟡 MEDIA</span><br>
+                    <span style="font-size: 11px;">2000-3500 kg MS/ha</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; padding: 4px; background-color: #e8f5e8; border-radius: 4px;">
+                <div style="width: 20px; height: 15px; background: #4CAF50; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #4CAF50;">🟢 ALTA</span><br>
+                    <span style="font-size: 11px;">&gt; 3500 kg MS/ha</span>
+                </div>
             </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #fff3e0; border-radius: 4px;">
-            <div style="width: 20px; height: 15px; background: #FF5252; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #FF9800;">🟠 BAJA</span><br>
-                <span style="font-size: 11px;">800-2000 kg MS/ha</span>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; background-color: #fffde7; border-radius: 4px;">
-            <div style="width: 20px; height: 15px; background: #FFEB3B; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #FFC107;">🟡 MEDIA</span><br>
-                <span style="font-size: 11px;">2000-3500 kg MS/ha</span>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; padding: 4px; background-color: #e8f5e8; border-radius: 4px;">
-            <div style="width: 20px; height: 15px; background: #4CAF50; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #4CAF50;">🟢 ALTA</span><br>
-                <span style="font-size: 11px;">&gt; 3500 kg MS/ha</span>
-            </div>
-        </div>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
-    return m
+        '''
+        m.get_root().html.add_child(folium.Element(legend_html))
+        
+        return m
+        
+    except Exception as e:
+        st.error(f"Error creando mapa disponibilidad: {e}")
+        return None
 
 def crear_mapa_recomendaciones(gdf_analizado, mapa_base="ESRI World Imagery"):
-    """Crea mapa interactivo con recomendaciones agroecológicas con leyenda CLARA y visible"""
-    if not FOLIUM_AVAILABLE:
+    """Crea mapa interactivo con recomendaciones agroecológicas con leyenda CLARA"""
+    if not FOLIUM_AVAILABLE or gdf_analizado is None or len(gdf_analizado) == 0:
         return None
         
-    m = crear_mapa_base(gdf_analizado, mapa_base)
-    
-    def estilo_recomendaciones(feature):
-        categoria = feature['properties']['categoria_disponibilidad']
-        if categoria == 'MUY BAJA':
-            color = '#D32F2F'  # Rojo oscuro - intervención urgente
-        elif categoria == 'BAJA':
-            color = '#FF9800'  # Naranja - manejo intensivo
-        elif categoria == 'MEDIA':
-            color = '#FFEB3B'  # Amarillo - manejo cuidadoso
-        else:
-            color = '#4CAF50'  # Verde - mantenimiento
+    try:
+        m = crear_mapa_base(gdf_analizado, mapa_base)
+        if m is None:
+            return None
             
-        return {
-            'fillColor': color,
-            'color': 'black',
-            'weight': 2,
-            'fillOpacity': 0.6
-        }
-    
-    # Agregar polígonos con recomendaciones
-    folium.GeoJson(
-        gdf_analizado.__geo_interface__,
-        style_function=estilo_recomendaciones,
-        tooltip=folium.GeoJsonTooltip(
-            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
-            aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad:', 'Autonomía (días):'],
-            localize=True,
-            style=("background-color: white; color: #333333; font-family: arial; font-size: 12px; padding: 10px;")
-        ),
-        popup=folium.GeoJsonPopup(
-            fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'ev_ha'],
-            aliases=['Sub-Lote:', 'Estado:', 'Disponibilidad (kg MS/ha):', 'EV/ha:'],
-            localize=True
-        )
-    ).add_to(m)
-    
-    # LEYENDA CLARA Y VISIBLE para Recomendaciones
-    legend_html = '''
-    <div style="
-        position: fixed; 
-        bottom: 20px; 
-        left: 20px; 
-        width: 320px; 
-        height: auto;
-        background-color: white; 
-        border: 3px solid #2E8B57;
-        z-index: 9999; 
-        font-size: 12px; 
-        padding: 12px;
-        border-radius: 8px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.4);
-        font-family: Arial, sans-serif;
-    ">
+        if 'categoria_disponibilidad' not in gdf_analizado.columns:
+            st.error("No se encuentra la columna 'categoria_disponibilidad' en los datos analizados")
+            return m
+            
+        def estilo_recomendaciones(feature):
+            if 'categoria_disponibilidad' not in feature['properties']:
+                return {'fillColor': 'gray', 'color': 'black', 'weight': 2, 'fillOpacity': 0.6}
+                
+            categoria = feature['properties']['categoria_disponibilidad']
+            if categoria == 'MUY BAJA':
+                color = '#D32F2F'
+            elif categoria == 'BAJA':
+                color = '#FF9800'
+            elif categoria == 'MEDIA':
+                color = '#FFEB3B'
+            else:
+                color = '#4CAF50'
+                
+            return {
+                'fillColor': color,
+                'color': 'black',
+                'weight': 2,
+                'fillOpacity': 0.6
+            }
+        
+        folium.GeoJson(
+            gdf_analizado.__geo_interface__,
+            style_function=estilo_recomendaciones,
+            tooltip=folium.GeoJsonTooltip(
+                fields=['id_subLote', 'categoria_disponibilidad', 'disponibilidad_forrajera_kg_ms_ha', 'dias_autonomia'],
+                aliases=['Sub-Lote:', 'Categoría:', 'Disponibilidad:', 'Autonomía (días):'],
+                localize=True
+            )
+        ).add_to(m)
+        
+        # LEYENDA MEJORADA
+        legend_html = '''
         <div style="
-            font-weight: bold; 
-            margin-bottom: 12px; 
-            text-align: center; 
-            font-size: 14px; 
-            color: #2E8B57;
-            background-color: #f0fff0;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #2E8B57;
+            position: fixed; 
+            bottom: 20px; 
+            left: 20px; 
+            width: 320px; 
+            background-color: white; 
+            border: 3px solid #2E8B57;
+            z-index: 9999; 
+            font-size: 12px; 
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
         ">
-            🌱 RECOMENDACIONES AGROECOLÓGICAS
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #ffebee; border-radius: 4px; border-left: 4px solid #D32F2F;">
-            <div style="width: 20px; height: 15px; background: #D32F2F; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #D32F2F;">🔴 INTERVENCIÓN URGENTE</span><br>
-                <span style="font-size: 11px;">Disponibilidad &lt; 800 kg MS/ha</span>
+            <div style="font-weight: bold; margin-bottom: 12px; text-align: center; font-size: 14px; color: #2E8B57;">
+                🌱 RECOMENDACIONES AGROECOLÓGICAS
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #ffebee; border-radius: 4px; border-left: 4px solid #D32F2F;">
+                <div style="width: 20px; height: 15px; background: #D32F2F; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #D32F2F;">🔴 INTERVENCIÓN URGENTE</span><br>
+                    <span style="font-size: 11px;">Disponibilidad &lt; 800 kg MS/ha</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #fff3e0; border-radius: 4px; border-left: 4px solid #FF9800;">
+                <div style="width: 20px; height: 15px; background: #FF9800; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #FF9800;">🟠 MANEJO INTENSIVO</span><br>
+                    <span style="font-size: 11px;">Disponibilidad 800-2000 kg MS/ha</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #fffde7; border-radius: 4px; border-left: 4px solid #FFEB3B;">
+                <div style="width: 20px; height: 15px; background: #FFEB3B; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #FFC107;">🟡 MANEJO CUIDADOSO</span><br>
+                    <span style="font-size: 11px;">Disponibilidad 2000-3500 kg MS/ha</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; padding: 6px; background-color: #e8f5e8; border-radius: 4px; border-left: 4px solid #4CAF50;">
+                <div style="width: 20px; height: 15px; background: #4CAF50; border: 2px solid #000; margin-right: 8px;"></div>
+                <div>
+                    <span style="font-weight: bold; color: #4CAF50;">🟢 MANTENIMIENTO</span><br>
+                    <span style="font-size: 11px;">Disponibilidad &gt; 3500 kg MS/ha</span>
+                </div>
             </div>
         </div>
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #fff3e0; border-radius: 4px; border-left: 4px solid #FF9800;">
-            <div style="width: 20px; height: 15px; background: #FF9800; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #FF9800;">🟠 MANEJO INTENSIVO</span><br>
-                <span style="font-size: 11px;">Disponibilidad 800-2000 kg MS/ha</span>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 6px; background-color: #fffde7; border-radius: 4px; border-left: 4px solid #FFEB3B;">
-            <div style="width: 20px; height: 15px; background: #FFEB3B; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #FFC107;">🟡 MANEJO CUIDADOSO</span><br>
-                <span style="font-size: 11px;">Disponibilidad 2000-3500 kg MS/ha</span>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; padding: 6px; background-color: #e8f5e8; border-radius: 4px; border-left: 4px solid #4CAF50;">
-            <div style="width: 20px; height: 15px; background: #4CAF50; border: 2px solid #000; margin-right: 8px; border-radius: 3px;"></div>
-            <div>
-                <span style="font-weight: bold; color: #4CAF50;">🟢 MANTENIMIENTO</span><br>
-                <span style="font-size: 11px;">Disponibilidad &gt; 3500 kg MS/ha</span>
-            </div>
-        </div>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
-    return m
+        '''
+        m.get_root().html.add_child(folium.Element(legend_html))
+        
+        return m
+        
+    except Exception as e:
+        st.error(f"Error creando mapa recomendaciones: {e}")
+        return None
 
 # =============================================================================
-# SISTEMA DE ANÁLISIS UNIFICADO - MEJORADO CON PARÁMETROS REALISTAS
+# SISTEMA DE ANÁLISIS UNIFICADO
 # =============================================================================
 
 class AnalizadorForrajeroUnificado:
@@ -874,7 +845,7 @@ class AnalizadorForrajeroUnificado:
         self.sh_config.check_configuration()
     
     def analizar_potrero(self, gdf, config):
-        """Análisis completo unificado con parámetros más realistas"""
+        """Análisis completo unificado"""
         try:
             st.header("🌱 ANÁLISIS FORRAJERO UNIFICADO")
             
@@ -960,25 +931,22 @@ class AnalizadorForrajeroUnificado:
             return gdf.geometry.area / 10000
     
     def _obtener_datos_vegetacion(self, gdf, config):
-        """Obtiene datos de vegetación (simulado o real) con parámetros realistas"""
+        """Obtiene datos de vegetación"""
         resultados = []
         processor = SentinelHubProcessor()
         parametros_personalizados = config.get('parametros_personalizados')
         
         for idx, row in gdf.iterrows():
-            # Obtener NDVI (real o simulado)
             fecha_imagen = config.get('fecha_imagen', datetime.now() - timedelta(days=30))
             bounds = gdf.total_bounds
             bbox = [bounds[0], bounds[1], bounds[2], bounds[3]]
             
             ndvi = processor.get_ndvi_for_geometry(row.geometry, fecha_imagen, bbox)
             
-            # Calcular biomasa basada en NDVI con parámetros realistas
             params = obtener_parametros(config['tipo_pastura'], parametros_personalizados)
             
-            # Cálculo más realista de biomasa considerando relación NDVI-biomasa
             if ndvi < params['UMBRAL_NDVI_SUELO']:
-                biomasa_total = params['FACTOR_BIOMASA_NDVI'] * 0.1  # Mínimo para suelo
+                biomasa_total = params['FACTOR_BIOMASA_NDVI'] * 0.1
             elif ndvi < 0.3:
                 biomasa_total = params['FACTOR_BIOMASA_NDVI'] * ndvi * 0.8
             elif ndvi < 0.6:
@@ -988,7 +956,6 @@ class AnalizadorForrajeroUnificado:
             
             biomasa_disponible = biomasa_total * params['TASA_UTILIZACION_RECOMENDADA']
             
-            # Clasificar vegetación más detallada
             if ndvi < params['UMBRAL_NDVI_SUELO']:
                 tipo_veg = "SUELO_DESNUDO"
             elif ndvi < 0.25:
@@ -1012,11 +979,10 @@ class AnalizadorForrajeroUnificado:
         return resultados
     
     def _calcular_metricas_ganaderas(self, gdf, resultados, config):
-        """Calcula todas las métricas ganaderas con parámetros realistas"""
+        """Calcula todas las métricas ganaderas"""
         parametros_personalizados = config.get('parametros_personalizados')
         params = obtener_parametros(config['tipo_pastura'], parametros_personalizados)
         
-        # Usar consumo personalizado si está disponible
         consumo_diario_personalizado = config.get('consumo_voluntario', params.get('CONSUMO_VOLUNTARIO', 10))
         eficiencia_pastoreo_personalizada = config.get('eficiencia_pastoreo', params['EFICIENCIA_PASTOREO'])
         eficiencia_cosecha_personalizada = config.get('eficiencia_cosecha', params['EFICIENCIA_COSECHA'])
@@ -1025,13 +991,9 @@ class AnalizadorForrajeroUnificado:
             area_ha = gdf.loc[gdf.index[idx], 'area_ha']
             biomasa_disponible = resultado['biomasa_disponible_kg_ms_ha']
             
-            # EV/ha con parámetros personalizados - cálculo más realista
             ev_ha = calcular_ev_ha(biomasa_disponible, consumo_diario_personalizado, eficiencia_pastoreo_personalizada)
-            
-            # Carga animal
             carga_animal = calcular_carga_animal_total(ev_ha, area_ha)
             
-            # Días de permanencia con cálculo mejorado
             biomasa_total_kg = biomasa_disponible * area_ha
             consumo_individual_kg = config['peso_promedio'] * params['CONSUMO_PORCENTAJE_PESO']
             consumo_total_diario = config['carga_animal'] * consumo_individual_kg
@@ -1043,7 +1005,6 @@ class AnalizadorForrajeroUnificado:
                 crecimiento_diario_kg
             )
             
-            # Añadir al GeoDataFrame
             for key, value in resultado.items():
                 gdf.loc[gdf.index[idx], key] = value
             
@@ -1056,27 +1017,20 @@ class AnalizadorForrajeroUnificado:
         return gdf
 
 # =============================================================================
-# GENERACIÓN DE INFORMES - MEJORADA CON PARÁMETROS REALISTAS
+# GENERACIÓN DE INFORMES
 # =============================================================================
 
 def crear_mapa_detallado(gdf_analizado, tipo_pastura):
     """Crea un mapa detallado para el informe"""
     try:
-        # Crear figura de matplotlib
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-        
-        # Plot simple para el informe
-        gdf_analizado.plot(column='ndvi', ax=ax, legend=True, 
-                          cmap='RdYlGn', vmin=0, vmax=1)
+        gdf_analizado.plot(column='ndvi', ax=ax, legend=True, cmap='RdYlGn', vmin=0, vmax=1)
         ax.set_title(f'Mapa de NDVI - {tipo_pastura}')
         ax.set_axis_off()
-        
-        # Guardar en buffer
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
         buffer.seek(0)
         plt.close()
-        
         return buffer
     except Exception as e:
         st.error(f"Error creando mapa para informe: {e}")
@@ -1090,17 +1044,13 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
     
     try:
         doc = Document()
+        doc.add_heading('INFORME DE ANÁLISIS FORRAJERO UNIFICADO', 0)
         
-        # Título
-        titulo = doc.add_heading('INFORME DE ANÁLISIS FORRAJERO UNIFICADO', 0)
-        
-        # Información general
         doc.add_heading('Información General', level=1)
         doc.add_paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         doc.add_paragraph(f"Tipo de pastura: {config['tipo_pastura']}")
         doc.add_paragraph(f"Usuario: {st.session_state.username}")
         
-        # Métricas principales
         doc.add_heading('Métricas Principales', level=1)
         area_total = gdf_analizado['area_ha'].sum()
         biomasa_prom = gdf_analizado['biomasa_disponible_kg_ms_ha'].mean()
@@ -1114,7 +1064,6 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
         doc.add_paragraph(f"Capacidad total de carga: {ev_total:.1f} EV")
         doc.add_paragraph(f"Días de permanencia promedio: {dias_prom:.1f} días")
         
-        # Mapa si está disponible
         if mapa_bytes:
             doc.add_heading('Mapa de Análisis', level=1)
             try:
@@ -1127,14 +1076,12 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
             except Exception as e:
                 doc.add_paragraph(f"Error al insertar mapa: {e}")
         
-        # Recomendaciones agroecológicas
         doc.add_heading('Recomendaciones Agroecológicas', level=1)
         recomendaciones = _generar_recomendaciones_agroecologicas(gdf_analizado, config)
         for recomendacion in recomendaciones.split('\n'):
             if recomendacion.strip():
                 doc.add_paragraph(recomendacion.strip())
         
-        # Guardar
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
@@ -1146,7 +1093,6 @@ def generar_informe_completo(gdf_analizado, config, mapa_bytes=None):
 
 def _generar_recomendaciones_agroecologicas(gdf, config):
     """Genera recomendaciones agroecológicas basadas en el análisis"""
-    biomasa_prom = gdf['biomasa_disponible_kg_ms_ha'].mean()
     disponibilidad_prom = gdf['disponibilidad_forrajera_kg_ms_ha'].mean()
     dias_prom = gdf['dias_permanencia'].mean()
     
@@ -1161,16 +1107,6 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
             "• Aplicar abonos verdes y cobertura orgánica (mulch)",
             "• Sembrar especies pioneras y leguminosas fijadoras de nitrógeno",
             "• Incorporar compost y biofertilizantes para recuperar suelo",
-            "",
-            "🐄 **MANEJO GANADERO:**",
-            "• Reducir carga animal inmediatamente (máximo 0.5 EV/ha)",
-            "• Implementar suplementación estratégica con conservas",
-            "• Rotaciones muy cortas (1-2 días) con largos descansos",
-            "",
-            "💧 **MANEJO HÍDRICO:**",
-            "• Implementar zanjas de infiltración y barreras vivas",
-            "• Proteger cursos de agua con franjas buffer",
-            "• Utilizar coberturas para retener humedad"
         ])
     elif disponibilidad_prom < 2000:
         recomendaciones.extend([
@@ -1181,16 +1117,6 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
             "• Enriquecer con mezclas de gramíneas y leguminosas",
             "• Aplicar microorganismos eficientes y biofertilizantes",
             "• Implementar pastoreo racional Voisin",
-            "",
-            "🐄 **MANEJO GANADERO:**",
-            "• Carga animal moderada (1-2 EV/ha según disponibilidad)",
-            "• Monitoreo semanal de crecimiento y ajuste de carga",
-            "• Pastoreos cortos e intensivos para estimular rebrote",
-            "",
-            "📊 **SEGUIMIENTO:**",
-            "• Medir altura forrajera y cobertura vegetal periódicamente",
-            "• Registrar datos de biomasa y días de descanso",
-            "• Ajustar manejo según observaciones en campo"
         ])
     else:
         recomendaciones.extend([
@@ -1201,19 +1127,8 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
             "• Diversificar con especies nativas y forrajeras perennes",
             "• Implementar agroforestería y sistemas silvopastoriles",
             "• Conservar biodiversidad y hábitats naturales",
-            "",
-            "🐄 **MANEJO GANADERO:**",
-            "• Carga animal óptima (2-4 EV/ha según capacidad)",
-            "• Rotaciones con 30-45 días de descanso",
-            "• Aprovechar picos de crecimiento con pastoreos intensivos",
-            "",
-            "🌍 **SUSTENTABILIDAD:**",
-            "• Monitorear salud del suelo y materia orgánica",
-            "• Implementar captura de carbono en pastizales",
-            "• Conservar corredores biológicos y fuentes de agua"
         ])
     
-    # Recomendaciones específicas adicionales
     if dias_prom < 7:
         recomendaciones.extend([
             "",
@@ -1221,18 +1136,11 @@ def _generar_recomendaciones_agroecologicas(gdf, config):
             "• Considerar suplementación inmediata",
             "• Revisar carga animal y distribución"
         ])
-    elif dias_prom > 60:
-        recomendaciones.extend([
-            "",
-            "✅ **EXCELENTE:** Sistema con buena autonomía",
-            "• Mantener prácticas actuales",
-            "• Considerar enriquecimiento con leguminosas"
-        ])
     
     return "\n".join(recomendaciones)
 
 # =============================================================================
-# INTERFAZ PRINCIPAL - MEJORADA CON PARÁMETROS REALISTAS
+# INTERFAZ PRINCIPAL
 # =============================================================================
 
 def main_application():
@@ -1249,35 +1157,20 @@ def main_application():
         
         st.markdown("---")
         
-        # =============================================================================
-        # 🛰️ CONFIGURACIÓN SENTINEL HUB
-        # =============================================================================
+        # Configuración Sentinel Hub
         st.header("🛰️ Configuración Sentinel Hub")
-        
-        # Inicializar y verificar configuración
         sh_config = SentinelHubConfig()
         sh_configured = sh_config.check_configuration()
-        
-        # Mostrar estado
         status_text = sh_config.get_credentials_status()
         if sh_configured:
             st.success(status_text)
         else:
             st.warning(status_text)
         
-        # Opción para configuración manual (solo si no está configurado)
         if not sh_configured:
             with st.expander("🔧 Configurar Manualmente", expanded=False):
-                st.info("""
-                **Para datos satelitales reales necesitas:**
-                1. Cuenta en [Sentinel Hub](https://www.sentinel-hub.com/)
-                2. Client ID y Client Secret
-                3. Configurar instancia en el dashboard
-                """)
-                
                 sh_client_id = st.text_input("Client ID", key="manual_client_id")
                 sh_client_secret = st.text_input("Client Secret", type="password", key="manual_client_secret")
-                
                 if st.button("💾 Guardar Credenciales Manualmente"):
                     if sh_client_id and sh_client_secret:
                         st.session_state.sh_client_id = sh_client_id
@@ -1285,113 +1178,37 @@ def main_application():
                         st.session_state.sh_configured = True
                         st.success("Credenciales guardadas en sesión")
                         st.rerun()
-                    else:
-                        st.error("Ingresa ambas credenciales")
-        
-        # Opción para limpiar credenciales (solo si están configuradas)
-        else:
-            if st.button("🔄 Limpiar Credenciales"):
-                if 'sh_client_id' in st.session_state:
-                    del st.session_state.sh_client_id
-                if 'sh_client_secret' in st.session_state:
-                    del st.session_state.sh_client_secret
-                st.session_state.sh_configured = False
-                st.success("Credenciales limpiadas")
-                st.rerun()
         
         st.markdown("---")
         
-        # =============================================================================
-        # 🌿 PARÁMETROS FORRAJEROS - MEJORADO CON PERSONALIZACIÓN Y MÁS REALISTAS
-        # =============================================================================
+        # Parámetros Forrajeros
         st.header("🌿 Parámetros Forrajeros")
         tipo_pastura = st.selectbox(
             "Tipo de Pastura:",
             ["ALFALFA", "RAYGRASS", "FESTUCA", "AGROPIRRO", "PASTIZAL_NATURAL", "PERSONALIZADO"]
         )
         
-        # Parámetros personalizados si se selecciona "PERSONALIZADO"
         parametros_personalizados = {}
         if tipo_pastura == "PERSONALIZADO":
             with st.expander("🔧 Parámetros Personalizados", expanded=True):
                 st.subheader("📊 Parámetros de Producción")
-                parametros_personalizados['MS_POR_HA_OPTIMO'] = st.number_input(
-                    "Biomasa Óptima (kg MS/ha):",
-                    min_value=1000, max_value=10000, value=3500, step=100,
-                    help="Materia seca óptima por hectárea"
-                )
-                parametros_personalizados['CRECIMIENTO_DIARIO'] = st.number_input(
-                    "Crecimiento Diario (kg MS/ha/día):",
-                    min_value=10, max_value=300, value=65, step=5,
-                    help="Crecimiento diario de materia seca"
-                )
-                parametros_personalizados['FACTOR_BIOMASA_NDVI'] = st.number_input(
-                    "Factor Biomasa-NDVI:",
-                    min_value=1000, max_value=5000, value=2500, step=100,
-                    help="Factor de conversión de NDVI a biomasa"
-                )
-                
-                st.subheader("🌿 Parámetros de Calidad")
-                parametros_personalizados['DIGESTIBILIDAD'] = st.slider(
-                    "Digestibilidad (%):",
-                    min_value=0.3, max_value=0.8, value=0.65, step=0.05,
-                    help="Porcentaje de digestibilidad del forraje"
-                )
-                parametros_personalizados['PROTEINA_CRUDA'] = st.slider(
-                    "Proteína Cruda (%):",
-                    min_value=0.05, max_value=0.25, value=0.14, step=0.01,
-                    help="Contenido de proteína cruda"
-                )
-                
-                st.subheader("📏 Umbrales de Detección")
-                parametros_personalizados['UMBRAL_NDVI_SUELO'] = st.slider(
-                    "Umbral NDVI Suelo:",
-                    min_value=0.05, max_value=0.3, value=0.16, step=0.01,
-                    help="NDVI por debajo de este valor se considera suelo desnudo"
-                )
-                parametros_personalizados['UMBRAL_NDVI_PASTURA'] = st.slider(
-                    "Umbral NDVI Pastura:",
-                    min_value=0.3, max_value=0.8, value=0.48, step=0.01,
-                    help="NDVI por encima de este valor se considera vegetación densa"
-                )
+                parametros_personalizados['MS_POR_HA_OPTIMO'] = st.number_input("Biomasa Óptima (kg MS/ha):", 1000, 10000, 3500, 100)
+                parametros_personalizados['CRECIMIENTO_DIARIO'] = st.number_input("Crecimiento Diario (kg MS/ha/día):", 10, 300, 65, 5)
+                parametros_personalizados['FACTOR_BIOMASA_NDVI'] = st.number_input("Factor Biomasa-NDVI:", 1000, 5000, 2500, 100)
         
-        # =============================================================================
-        # 🐄 PARÁMETROS GANADEROS - MEJORADO CON CONSUMO VOLUNTARIO REALISTA
-        # =============================================================================
+        # Parámetros Ganaderos
         st.header("🐄 Parámetros Ganaderos")
         peso_promedio = st.slider("Peso promedio (kg):", 300, 600, 450)
         carga_animal = st.slider("Carga animal:", 1, 1000, 100)
         
         with st.expander("🍽️ Parámetros de Consumo", expanded=False):
-            st.subheader("Consumo Animal")
-            consumo_voluntario = st.number_input(
-                "Consumo Voluntario (kg MS/día/animal):",
-                min_value=8.0, max_value=15.0, value=11.0, step=0.5,
-                help="Consumo diario de materia seca por animal"
-            )
-            
-            st.subheader("Eficiencias")
-            eficiencia_pastoreo = st.slider(
-                "Eficiencia de Pastoreo (%):",
-                min_value=50, max_value=90, value=70, step=5,
-                help="Porcentaje de forraje que realmente consume el animal"
-            ) / 100.0
-            
-            eficiencia_cosecha = st.slider(
-                "Eficiencia de Cosecha (%):",
-                min_value=50, max_value=90, value=65, step=5,
-                help="Porcentaje de biomasa que se puede cosechar eficientemente"
-            ) / 100.0
+            consumo_voluntario = st.number_input("Consumo Voluntario (kg MS/día/animal):", 8.0, 15.0, 11.0, 0.5)
+            eficiencia_pastoreo = st.slider("Eficiencia de Pastoreo (%):", 50, 90, 70, 5) / 100.0
+            eficiencia_cosecha = st.slider("Eficiencia de Cosecha (%):", 50, 90, 65, 5) / 100.0
         
-        # =============================================================================
-        # 📅 CONFIGURACIÓN TEMPORAL Y ESPACIAL
-        # =============================================================================
+        # Configuración Temporal y Espacial
         st.header("📅 Configuración Temporal")
-        fecha_imagen = st.date_input(
-            "Fecha de imagen:",
-            value=datetime.now() - timedelta(days=30),
-            max_value=datetime.now()
-        )
+        fecha_imagen = st.date_input("Fecha de imagen:", value=datetime.now() - timedelta(days=30), max_value=datetime.now())
         
         st.header("📐 Configuración Espacial")
         n_divisiones = st.slider("Sub-divisiones:", 8, 48, 24)
@@ -1403,10 +1220,8 @@ def main_application():
     st.title("🌱 Analizador Forrajero Unificado")
     st.markdown("---")
     
-    # Inicializar analizador
     analizador = AnalizadorForrajeroUnificado()
     
-    # Procesar archivo cargado
     if uploaded_file is not None:
         with st.spinner("Cargando y procesando archivo..."):
             try:
@@ -1426,7 +1241,6 @@ def main_application():
             except Exception as e:
                 st.error(f"Error cargando shapefile: {e}")
     
-    # Mostrar datos cargados y opción de análisis
     if 'gdf_cargado' in st.session_state and st.session_state.gdf_cargado is not None:
         gdf = st.session_state.gdf_cargado
         
@@ -1446,7 +1260,6 @@ def main_application():
             st.subheader("🗺️ Vista Previa del Potrero")
             mapa_preview = crear_mapa_base(gdf)
             if mapa_preview:
-                # Agregar polígono al mapa
                 folium.GeoJson(
                     gdf.__geo_interface__,
                     style_function=lambda x: {'fillColor': '#3388ff', 'color': 'blue', 'weight': 2, 'fillOpacity': 0.3}
@@ -1473,22 +1286,11 @@ def main_application():
                 if gdf_analizado is not None:
                     st.session_state.gdf_analizado = gdf_analizado
                     st.success("✅ Análisis completado exitosamente!")
-                    
-                    # Mostrar resultados
                     mostrar_resultados_completos(gdf_analizado, config)
     
     else:
-        # Pantalla de bienvenida
         st.info("""
         ### 🌱 Bienvenido al Analizador Forrajero Unificado
-        
-        **Características:**
-        - 🛰️ **Datos satelitales** con Sentinel Hub
-        - 📊 **Cálculo de EV/ha** y capacidad de carga
-        - 📅 **Días de permanencia** por lote
-        - 🗺️ **Mapas interactivos** con múltiples bases
-        - 📄 **Informes automáticos** con recomendaciones
-        - 🔐 **Sistema de autenticación** seguro
         
         **Para comenzar:**
         1. Configura los parámetros en la barra lateral
@@ -1501,21 +1303,17 @@ def mostrar_resultados_completos(gdf_analizado, config):
     """Muestra resultados completos del análisis con mapas mejorados"""
     st.header("📊 RESULTADOS DEL ANÁLISIS COMPLETO")
     
-    # Métricas principales mejoradas
+    # Métricas principales
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
         biomasa_prom = gdf_analizado['biomasa_disponible_kg_ms_ha'].mean()
         st.metric("Biomasa Disponible", f"{biomasa_prom:.0f} kg MS/ha")
-    
     with col2:
         disponibilidad_prom = gdf_analizado['disponibilidad_forrajera_kg_ms_ha'].mean()
         st.metric("Disponibilidad Forrajera", f"{disponibilidad_prom:.0f} kg MS/ha")
-    
     with col3:
         ev_total = gdf_analizado['carga_animal'].sum()
         st.metric("Capacidad Total", f"{ev_total:.1f} EV")
-    
     with col4:
         dias_prom = gdf_analizado['dias_permanencia'].mean()
         st.metric("Días Permanencia", f"{dias_prom:.1f}")
@@ -1524,24 +1322,16 @@ def mostrar_resultados_completos(gdf_analizado, config):
     st.subheader("📈 Distribución de Disponibilidad Forrajera")
     distribucion = gdf_analizado['categoria_disponibilidad'].value_counts()
     col_dist1, col_dist2, col_dist3, col_dist4 = st.columns(4)
-    
     with col_dist1:
-        muy_baja = distribucion.get('MUY BAJA', 0)
-        st.metric("🔴 Muy Baja", f"{muy_baja} sub-lotes")
-    
+        st.metric("🔴 Muy Baja", f"{distribucion.get('MUY BAJA', 0)}")
     with col_dist2:
-        baja = distribucion.get('BAJA', 0)
-        st.metric("🟠 Baja", f"{baja} sub-lotes")
-    
+        st.metric("🟠 Baja", f"{distribucion.get('BAJA', 0)}")
     with col_dist3:
-        media = distribucion.get('MEDIA', 0)
-        st.metric("🟡 Media", f"{media} sub-lotes")
-    
+        st.metric("🟡 Media", f"{distribucion.get('MEDIA', 0)}")
     with col_dist4:
-        alta = distribucion.get('ALTA', 0)
-        st.metric("🟢 Alta", f"{alta} sub-lotes")
+        st.metric("🟢 Alta", f"{distribucion.get('ALTA', 0)}")
     
-    # Mapas de resultados - CON LEYENDAS CLARAS
+    # Mapas de resultados - AHORA DEBERÍAN FUNCIONAR
     if FOLIUM_AVAILABLE:
         st.header("🗺️ VISUALIZACIÓN INTERACTIVA")
         
@@ -1554,18 +1344,11 @@ def mostrar_resultados_completos(gdf_analizado, config):
                 key="mapa_base_selector"
             )
         
-        # Pestañas con mapas funcionales
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🌿 NDVI", 
-            "🐄 EV/ha", 
-            "📊 Disponibilidad",
-            "🌱 Recomendaciones",
-            "📋 Resumen"
-        ])
+        # Pestañas con mapas
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌿 NDVI", "🐄 EV/ha", "📊 Disponibilidad", "🌱 Recomendaciones", "📋 Resumen"])
         
         with tab1:
             st.subheader("🌿 ÍNDICE NDVI - ESTADO VEGETATIVO")
-            st.info("💡 **Interpretación NDVI:** Valores más altos indican mejor estado de la vegetación")
             mapa_ndvi = crear_mapa_ndvi(gdf_analizado, mapa_base_seleccionado)
             if mapa_ndvi:
                 folium_static(mapa_ndvi, width=800, height=600)
@@ -1574,7 +1357,6 @@ def mostrar_resultados_completos(gdf_analizado, config):
         
         with tab2:
             st.subheader("🐄 CAPACIDAD DE CARGA - EV/HA")
-            st.info("💡 **Interpretación EV/ha:** Número de animales que puede sostener cada hectárea")
             mapa_ev = crear_mapa_ev_ha(gdf_analizado, mapa_base_seleccionado)
             if mapa_ev:
                 folium_static(mapa_ev, width=800, height=600)
@@ -1583,7 +1365,6 @@ def mostrar_resultados_completos(gdf_analizado, config):
         
         with tab3:
             st.subheader("📊 DISPONIBILIDAD FORRAJERA")
-            st.info("💡 **Interpretación:** Cantidad de forraje disponible para el consumo animal")
             mapa_disp = crear_mapa_disponibilidad(gdf_analizado, mapa_base_seleccionado)
             if mapa_disp:
                 folium_static(mapa_disp, width=800, height=600)
@@ -1592,99 +1373,46 @@ def mostrar_resultados_completos(gdf_analizado, config):
         
         with tab4:
             st.subheader("🌱 RECOMENDACIONES AGROECOLÓGICAS")
-            st.info("💡 **Interpretación:** Acciones sugeridas según el estado forrajero")
             mapa_recom = crear_mapa_recomendaciones(gdf_analizado, mapa_base_seleccionado)
             if mapa_recom:
                 folium_static(mapa_recom, width=800, height=600)
             else:
                 st.warning("No se pudo generar el mapa de recomendaciones")
             
-            # Recomendaciones detalladas
             st.subheader("📝 RECOMENDACIONES DETALLADAS")
             recomendaciones = _generar_recomendaciones_agroecologicas(gdf_analizado, config)
             st.markdown(recomendaciones)
         
         with tab5:
             st.subheader("📋 RESUMEN POR SUB-LOTE")
-            # Tabla de resultados completa
-            columnas = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 
-                       'biomasa_disponible_kg_ms_ha', 'disponibilidad_forrajera_kg_ms_ha',
-                       'categoria_disponibilidad', 'ev_ha', 'dias_permanencia', 'dias_autonomia']
-            
-            # Filtrar columnas que existen
+            columnas = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 'biomasa_disponible_kg_ms_ha', 'disponibilidad_forrajera_kg_ms_ha', 'categoria_disponibilidad', 'ev_ha', 'dias_permanencia']
             columnas_existentes = [col for col in columnas if col in gdf_analizado.columns]
             tabla = gdf_analizado[columnas_existentes].copy()
-            
-            # Renombrar columnas para mejor visualización
-            nombres_columnas = {
-                'id_subLote': 'Sub-Lote',
-                'area_ha': 'Área (ha)',
-                'tipo_superficie': 'Tipo Superficie',
-                'ndvi': 'NDVI',
-                'biomasa_disponible_kg_ms_ha': 'Biomasa (kg MS/ha)',
-                'disponibilidad_forrajera_kg_ms_ha': 'Disponibilidad (kg MS/ha)',
-                'categoria_disponibilidad': 'Categoría',
-                'ev_ha': 'EV/ha',
-                'dias_permanencia': 'Días Permanencia',
-                'dias_autonomia': 'Días Autonomía'
-            }
-            
-            tabla.columns = [nombres_columnas.get(col, col) for col in tabla.columns]
             st.dataframe(tabla, use_container_width=True)
-    
-    else:
-        st.warning("⚠️ Folium no está disponible. Los mapas interactivos no se mostrarán.")
     
     # Exportar datos
     st.header("💾 EXPORTAR RESULTADOS")
     col_exp1, col_exp2, col_exp3 = st.columns(3)
     
     with col_exp1:
-        # CSV con todas las métricas
-        columnas_exportar = ['id_subLote', 'area_ha', 'tipo_superficie', 'ndvi', 
-                           'biomasa_disponible_kg_ms_ha', 'disponibilidad_forrajera_kg_ms_ha',
-                           'categoria_disponibilidad', 'ev_ha', 'dias_permanencia', 'dias_autonomia']
-        columnas_exportar = [col for col in columnas_exportar if col in gdf_analizado.columns]
-        
-        csv = gdf_analizado[columnas_exportar].to_csv(index=False)
-        st.download_button(
-            "📥 Descargar CSV Completo",
-            csv,
-            f"resultados_completos_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            "text/csv",
-            key="download_csv_unique"
-        )
+        csv = gdf_analizado.to_csv(index=False)
+        st.download_button("📥 Descargar CSV", csv, f"resultados_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", "text/csv", key="download_csv")
     
     with col_exp2:
-        # GeoJSON
         geojson = gdf_analizado.to_json()
-        st.download_button(
-            "📥 Descargar GeoJSON",
-            geojson,
-            f"resultados_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson",
-            "application/json",
-            key="download_geojson_unique"
-        )
+        st.download_button("📥 Descargar GeoJSON", geojson, f"resultados_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson", "application/json", key="download_geojson")
     
     with col_exp3:
-        # Informe DOCX
         if DOCX_AVAILABLE:
             with st.spinner("Preparando informe..."):
                 mapa_buffer = crear_mapa_detallado(gdf_analizado, config['tipo_pastura'])
                 informe_buffer = generar_informe_completo(gdf_analizado, config, mapa_buffer)
-                
                 if informe_buffer:
-                    st.download_button(
-                        "📄 Descargar Informe DOCX",
-                        data=informe_buffer.getvalue(),
-                        file_name=f"informe_forrajero_{config['tipo_pastura']}_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key="download_docx_unique"
-                    )
+                    st.download_button("📄 Descargar Informe DOCX", data=informe_buffer.getvalue(), file_name=f"informe_{datetime.now().strftime('%Y%m%d_%H%M')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key="download_docx")
                 else:
                     st.error("Error generando informe DOCX")
         else:
-            st.warning("python-docx no disponible para generar informes")
+            st.warning("python-docx no disponible")
 
 # =============================================================================
 # FUNCIÓN PRINCIPAL
