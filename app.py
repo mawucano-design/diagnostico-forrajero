@@ -62,6 +62,13 @@ def initialize_session_state():
         st.session_state.docx_buffer = None
     if 'html_download_injected' not in st.session_state:
         st.session_state.html_download_injected = False
+    # Nuevos parámetros ganaderos en session state
+    if 'eficiencia_cosecha' not in st.session_state:
+        st.session_state.eficiencia_cosecha = 0.55
+    if 'consumo_diario_ev' not in st.session_state:
+        st.session_state.consumo_diario_ev = 10.0
+    if 'eficiencia_pastoreo' not in st.session_state:
+        st.session_state.eficiencia_pastoreo = 0.65
 
 def check_authentication():
     """Verifica las credenciales de autenticación"""
@@ -113,7 +120,7 @@ def login_section():
         """)
 
 # =============================================================================
-# PARÁMETROS FORRAJEROS COMPLETOS
+# PARÁMETROS FORRAJEROS COMPLETOS CON PARÁMETROS GANADEROS
 # =============================================================================
 
 PARAMETROS_FORRAJEROS_BASE = {
@@ -122,30 +129,45 @@ PARAMETROS_FORRAJEROS_BASE = {
         'CRECIMIENTO_DIARIO': 100, 
         'CONSUMO_PORCENTAJE_PESO': 0.03,
         'TASA_UTILIZACION_RECOMENDADA': 0.65,
+        'EFICIENCIA_COSECHA': 0.70,
+        'EFICIENCIA_PASTOREO': 0.75,
+        'CONSUMO_DIARIO_EV': 12.0
     },
     'RAYGRASS': {
         'MS_POR_HA_OPTIMO': 4500, 
         'CRECIMIENTO_DIARIO': 90, 
         'CONSUMO_PORCENTAJE_PESO': 0.028,
         'TASA_UTILIZACION_RECOMENDADA': 0.60,
+        'EFICIENCIA_COSECHA': 0.67,
+        'EFICIENCIA_PASTOREO': 0.72,
+        'CONSUMO_DIARIO_EV': 11.0
     },
     'FESTUCA': {
         'MS_POR_HA_OPTIMO': 4000, 
         'CRECIMIENTO_DIARIO': 70, 
         'CONSUMO_PORCENTAJE_PESO': 0.025,
         'TASA_UTILIZACION_RECOMENDADA': 0.55,
+        'EFICIENCIA_COSECHA': 0.62,
+        'EFICIENCIA_PASTOREO': 0.68,
+        'CONSUMO_DIARIO_EV': 10.0
     },
     'AGROPIRRO': {
         'MS_POR_HA_OPTIMO': 3500, 
         'CRECIMIENTO_DIARIO': 60, 
         'CONSUMO_PORCENTAJE_PESO': 0.022,
         'TASA_UTILIZACION_RECOMENDADA': 0.50,
+        'EFICIENCIA_COSECHA': 0.58,
+        'EFICIENCIA_PASTOREO': 0.65,
+        'CONSUMO_DIARIO_EV': 9.0
     },
     'PASTIZAL_NATURAL': {
         'MS_POR_HA_OPTIMO': 3000, 
         'CRECIMIENTO_DIARIO': 40, 
         'CONSUMO_PORCENTAJE_PESO': 0.020,
         'TASA_UTILIZACION_RECOMENDADA': 0.45,
+        'EFICIENCIA_COSECHA': 0.55,
+        'EFICIENCIA_PASTOREO': 0.60,
+        'CONSUMO_DIARIO_EV': 8.0
     }
 }
 
@@ -157,7 +179,7 @@ def obtener_parametros_forrajeros(tipo_pastura, personalizados=None):
         return PARAMETROS_FORRAJEROS_BASE.get(tipo_pastura, PARAMETROS_FORRAJEROS_BASE['FESTUCA'])
 
 # =============================================================================
-# FUNCIONES DE CÁLCULO MEJORADAS
+# FUNCIONES DE CÁLCULO MEJORADAS CON PARÁMETROS GANADEROS
 # =============================================================================
 
 def calcular_superficie(gdf):
@@ -375,8 +397,9 @@ def calcular_indices_forrajeros_realista(gdf, tipo_pastura, fuente_satelital, fe
         st.error(traceback.format_exc())
         return []
 
-def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carga_animal):
-    """Cálculo de métricas ganaderas realistas"""
+def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carga_animal, 
+                               eficiencia_cosecha, eficiencia_pastoreo, consumo_diario_ev):
+    """Cálculo de métricas ganaderas realistas CON PARÁMETROS GANADEROS COMPLETOS"""
     params = obtener_parametros_forrajeros(tipo_pastura)
     metricas = []
     
@@ -384,13 +407,13 @@ def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carg
         biomasa_disponible = row.get('biomasa_disponible_kg_ms_ha', 0)
         area_ha = row.get('area_ha', 0)
         
+        # Usar parámetros ganaderos personalizados o por defecto
         consumo_individual_kg = peso_promedio * params['CONSUMO_PORCENTAJE_PESO']
-        biomasa_total_disponible = biomasa_disponible * area_ha
+        biomasa_total_disponible = biomasa_disponible * area_ha * eficiencia_cosecha
         
         if biomasa_total_disponible > 0 and consumo_individual_kg > 0:
-            # EV soportable
-            ev_por_dia = biomasa_total_disponible * 0.001 / consumo_individual_kg
-            ev_soportable = ev_por_dia / params['TASA_UTILIZACION_RECOMENDADA']
+            # EV soportable - cálculo corregido
+            ev_soportable = (biomasa_total_disponible * eficiencia_pastoreo) / (consumo_diario_ev * 30)  # Mensual
             ev_soportable = max(0.01, ev_soportable)
         else:
             ev_soportable = 0.01
@@ -402,11 +425,11 @@ def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carg
         else:
             ev_ha_display = 0.01
         
-        # Días de permanencia
+        # Días de permanencia - cálculo corregido
         if carga_animal > 0:
-            consumo_total_diario = carga_animal * consumo_individual_kg
+            consumo_total_diario = carga_animal * consumo_diario_ev
             if consumo_total_diario > 0 and biomasa_total_disponible > 0:
-                dias_permanencia = biomasa_total_disponible / consumo_total_diario
+                dias_permanencia = (biomasa_total_disponible * eficiencia_pastoreo) / consumo_total_diario
                 dias_permanencia = min(max(dias_permanencia, 0.1), 120)  # Límite realista
             else:
                 dias_permanencia = 0.1
@@ -434,7 +457,10 @@ def calcular_metricas_ganaderas(gdf_analizado, tipo_pastura, peso_promedio, carg
             'biomasa_total_kg': round(biomasa_total_disponible, 1),
             'consumo_individual_kg': round(consumo_individual_kg, 1),
             'estado_forrajero': estado_forrajero,
-            'ev_ha': round(ev_ha_display, 3)
+            'ev_ha': round(ev_ha_display, 3),
+            'eficiencia_cosecha_usada': eficiencia_cosecha,
+            'eficiencia_pastoreo_usada': eficiencia_pastoreo,
+            'consumo_diario_ev_usado': consumo_diario_ev
         })
     
     return metricas
@@ -973,10 +999,22 @@ def main_application():
             consumo_porcentaje = 0.025
             tasa_utilizacion = 0.55
 
-        # Parámetros ganaderos
-        st.subheader("🐄 Parámetros Ganaderos")
+        # PARÁMETROS GANADEROS COMPLETOS
+        st.subheader("🐄 Parámetros Ganaderos Completos")
         peso_promedio = st.slider("Peso promedio animal (kg):", 300, 600, 450)
         carga_animal = st.slider("Carga animal (cabezas):", 1, 1000, 100)
+        
+        # Nuevos parámetros ganaderos críticos
+        st.subheader("📈 Eficiencias y Consumo")
+        eficiencia_cosecha = st.slider("Eficiencia de Cosecha (%):", 30, 90, 55) / 100.0
+        eficiencia_pastoreo = st.slider("Eficiencia de Pastoreo (%):", 30, 90, 65) / 100.0
+        consumo_diario_ev = st.number_input("Consumo Diario por EV (kg MS/día):", 
+                                          min_value=5.0, max_value=20.0, value=10.0, step=0.5)
+
+        # Guardar en session state para persistencia
+        st.session_state.eficiencia_cosecha = eficiencia_cosecha
+        st.session_state.eficiencia_pastoreo = eficiencia_pastoreo
+        st.session_state.consumo_diario_ev = consumo_diario_ev
 
         # Configuración temporal
         st.subheader("📅 Configuración Temporal")
@@ -1019,41 +1057,43 @@ def main_application():
             st.success("✅ Datos de ejemplo cargados!")
             st.rerun()
 
-    # Contenido principal
+    # Contenido principal - MANTENER EL ESTADO DESPUÉS DEL ANÁLISIS
     st.title("🌱 Analizador Forrajero PRV - Versión Completa")
     st.markdown("---")
     
-    # Procesar archivo cargado
+    # Mostrar datos cargados si existen
+    if st.session_state.gdf_cargado is not None:
+        gdf_loaded = st.session_state.gdf_cargado
+        area_total = calcular_superficie(gdf_loaded).sum()
+        
+        st.success("✅ Archivo cargado correctamente.")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1: 
+            st.metric("Polígonos", len(gdf_loaded))
+        with col2: 
+            st.metric("Área total (ha)", f"{area_total:.2f}")
+        with col3: 
+            st.metric("Tipo pastura", tipo_pastura)
+        with col4: 
+            st.metric("Fuente datos", fuente_satelital)
+        
+        # Vista previa del mapa con ZOOM AUTOMÁTICO
+        if FOLIUM_AVAILABLE:
+            st.markdown("---")
+            st.markdown("### 🗺️ Vista Previa del Potrero")
+            m = crear_mapa_interactivo(gdf_loaded, base_map_option)
+            if m:
+                st_folium(m, width=1200, height=500)
+
+    # Procesar archivo cargado NUEVO
     if uploaded_file is not None:
         with st.spinner("Cargando shapefile..."):
             gdf_loaded = cargar_shapefile_desde_zip(uploaded_file)
             if gdf_loaded is not None and len(gdf_loaded) > 0:
                 st.session_state.gdf_cargado = gdf_loaded
-                area_total = calcular_superficie(gdf_loaded).sum()
-                st.success("✅ Archivo cargado correctamente.")
-                
-                # Mostrar información del archivo
-                col1, col2, col3, col4 = st.columns(4)
-                with col1: 
-                    st.metric("Polígonos", len(gdf_loaded))
-                with col2: 
-                    st.metric("Área total (ha)", f"{area_total:.2f}")
-                with col3: 
-                    st.metric("Tipo pastura", tipo_pastura)
-                with col4: 
-                    st.metric("Fuente datos", fuente_satelital)
-                
-                # Vista previa del mapa con ZOOM AUTOMÁTICO
-                if FOLIUM_AVAILABLE:
-                    st.markdown("---")
-                    st.markdown("### 🗺️ Vista Previa del Potrero")
-                    m = crear_mapa_interactivo(gdf_loaded, base_map_option)
-                    if m:
-                        st_folium(m, width=1200, height=500)
-                else:
-                    st.info("Instalá folium y streamlit-folium para ver el mapa interactivo")
+                st.rerun()
 
-    # Ejecutar análisis
+    # Ejecutar análisis - SOLO SI HAY DATOS CARGADOS
     st.markdown("---")
     st.markdown("### 🚀 Ejecutar Análisis Forrajero")
     
@@ -1083,8 +1123,13 @@ def main_application():
                                 if k != 'id_subLote':
                                     gdf_sub.loc[gdf_sub['id_subLote'] == rec['id_subLote'], k] = v
                         
-                        # 5. Calcular métricas ganaderas
-                        metricas = calcular_metricas_ganaderas(gdf_sub, tipo_pastura, peso_promedio, carga_animal)
+                        # 5. Calcular métricas ganaderas CON PARÁMETROS COMPLETOS
+                        metricas = calcular_metricas_ganaderas(
+                            gdf_sub, tipo_pastura, peso_promedio, carga_animal,
+                            st.session_state.eficiencia_cosecha,
+                            st.session_state.eficiencia_pastoreo, 
+                            st.session_state.consumo_diario_ev
+                        )
                         
                         for idx, met in enumerate(metricas):
                             for k, v in met.items():
@@ -1148,6 +1193,7 @@ def main_application():
                         else:
                             st.warning("python-docx no está instalado — no puedo generar DOCX. Ejecutá: pip install python-docx")
                         
+                        # 9. Mostrar resultados completos
                         st.session_state.analisis_completado = True
                         mostrar_resultados_completos(gdf_sub, base_map_option)
                         
@@ -1158,6 +1204,11 @@ def main_application():
                     st.error(f"❌ Error en el análisis: {e}")
                     import traceback
                     st.error(traceback.format_exc())
+    
+    # Mostrar resultados si ya se completó el análisis
+    elif st.session_state.analisis_completado and st.session_state.gdf_analizado is not None:
+        mostrar_resultados_completos(st.session_state.gdf_analizado, base_map_option)
+    
     else:
         # Pantalla de bienvenida
         st.info("""
@@ -1167,18 +1218,15 @@ def main_application():
         - ✅ Sistema de autenticación seguro
         - ✅ Análisis realista de biomasa forrajera
         - ✅ Mapas interactivos con ZOOM AUTOMÁTICO
-        - ✅ Múltiples mapas base (ESRI Satélite, OpenStreetMap, CartoDB)
-        - ✅ Parámetros forrajeros personalizables
+        - ✅ Parámetros ganaderos completos (eficiencia de cosecha, eficiencia de pastoreo, consumo diario)
         - ✅ Exportación a DOCX funcional con descarga automática
         - ✅ Análisis espacial detallado por sub-lotes
-        - ✅ Métricas ganaderas realistas (EV/ha, días de permanencia)
         
         **Para comenzar:**
         1. **Configura** los parámetros en la barra lateral
         2. **Carga** tu shapefile en formato ZIP o usa datos de ejemplo
         3. **Ejecuta** el análisis completo
         4. **Explora** los resultados en mapas interactivos
-        5. **Descarga** el informe DOCX automáticamente
         """)
 
 def mostrar_resultados_completos(gdf_analizado, base_map_option):
@@ -1204,6 +1252,16 @@ def mostrar_resultados_completos(gdf_analizado, base_map_option):
     with col4:
         dias_prom = gdf_analizado['dias_permanencia'].mean()
         st.metric("Días de Permanencia Promedio", f"{dias_prom:.1f}")
+    
+    # Mostrar parámetros ganaderos usados
+    st.subheader("⚙️ Parámetros Ganaderos Aplicados")
+    col_param1, col_param2, col_param3 = st.columns(3)
+    with col_param1:
+        st.metric("Eficiencia de Cosecha", f"{st.session_state.eficiencia_cosecha*100:.0f}%")
+    with col_param2:
+        st.metric("Eficiencia de Pastoreo", f"{st.session_state.eficiencia_pastoreo*100:.0f}%")
+    with col_param3:
+        st.metric("Consumo Diario por EV", f"{st.session_state.consumo_diario_ev} kg MS/día")
     
     # MAPAS INTERACTIVOS CON ZOOM AUTOMÁTICO Y PESTAÑAS
     if FOLIUM_AVAILABLE:
